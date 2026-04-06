@@ -1,0 +1,289 @@
+name: Build and Release PsPixel
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.7.2'
+        target: 'desktop'
+        arch: 'win64_mingw'
+        tools: 'tools_mingw'
+        cache: true
+
+    - name: Install NSIS
+      run: choco install nsis -y
+
+    - name: Install CMake and Ninja
+      run: choco install cmake ninja -y
+
+    - name: Setup build environment
+      run: |
+        echo "D:\a\PsPixel\Qt\6.7.2\mingw_64\bin" >> $env:GITHUB_PATH
+        echo "D:\a\PsPixel\Qt\Tools\mingw1120_64\bin" >> $env:GITHUB_PATH
+        echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+
+    - name: Configure with CMake
+      run: cmake -B build -G Ninja -DCMAKE_PREFIX_PATH="D:\a\PsPixel\Qt\6.7.2\mingw_64" -DCMAKE_BUILD_TYPE=Release desktop
+
+    - name: Build with Ninja
+      run: ninja -C build
+
+    - name: Deploy Qt dependencies
+      run: |
+        if (Test-Path "deploy") { Remove-Item "deploy" -Recurse -Force }
+        New-Item -ItemType Directory -Path "deploy\PsPixel" -Force | Out-Null
+        Copy-Item "build\bin\PsPixel.exe" "deploy\PsPixel\"
+        Copy-Item "desktop\assets\icon.png" "deploy\PsPixel\" -ErrorAction SilentlyContinue
+        Copy-Item "desktop\assets\icon.ico" "deploy\PsPixel\" -ErrorAction SilentlyContinue
+        windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw "deploy\PsPixel\PsPixel.exe"
+
+    - name: Create installer
+      run: makensis desktop\installer.nsi
+
+    - name: Get version from tag
+      id: get_version
+      run: |
+        $tag = "${{ github.ref }}" -replace 'refs/tags/', ''
+        echo "VERSION=$tag" >> $env:GITHUB_OUTPUT
+
+    - name: Create portable zip
+      run: Compress-Archive -Path "deploy\PsPixel\*" -DestinationPath "PsPixel-${{ steps.get_version.outputs.VERSION }}-Portable.zip"
+
+    - name: Rename installer
+      run: Move-Item "desktop\PsPixel_Setup.exe" "PsPixel-${{ steps.get_version.outputs.VERSION }}-Setup.exe"
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: PsPixel ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ## PsPixel ${{ steps.get_version.outputs.VERSION }}
+
+          Professional Pixel Art Editor by Jace Sleeman
+
+          ### Downloads
+          - **Setup.exe** - Windows Installer
+          - **Portable.zip** - No installation required
+
+          ### Features
+          - Drawing tools: Brush, Eraser, Line, Rectangle, Circle, Paint Bucket, Eyedropper, Select/Move
+          - Layer system with opacity and visibility
+          - Mirror/Symmetry drawing mode
+          - Flip and Rotate transforms
+          - Copy/Paste with selection
+          - Customizable keyboard shortcuts
+          - Bulk layer export
+          - Undo/redo history palette
+          - MCP server for AI-driven pixel art
+          - Save/export in .pspx and PNG
+        files: |
+          PsPixel-${{ steps.get_version.outputs.VERSION }}-Setup.exe
+          PsPixel-${{ steps.get_version.outputs.VERSION }}-Portable.zip
+        draft: false
+        prerelease: false
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qt6-base-dev libqt6network6 qt6-base-private-dev cmake ninja-build rpm
+
+    - name: Build
+      run: |
+        cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release desktop
+        ninja -C build
+
+    - name: Get version from tag
+      id: get_version
+      run: |
+        VERSION="${GITHUB_REF#refs/tags/v}"
+        echo "VERSION=v${VERSION}" >> $GITHUB_OUTPUT
+        echo "SEMVER=${VERSION}" >> $GITHUB_OUTPUT
+
+    - name: Create tarball
+      run: |
+        mkdir -p PsPixel-linux/usr/bin
+        mkdir -p PsPixel-linux/usr/share/applications
+        mkdir -p PsPixel-linux/usr/share/icons/hicolor/256x256/apps
+        cp build/bin/PsPixel PsPixel-linux/usr/bin/
+        cp desktop/assets/icon.png PsPixel-linux/usr/share/icons/hicolor/256x256/apps/pspixel.png
+        cat > PsPixel-linux/usr/share/applications/pspixel.desktop << 'EOF'
+        [Desktop Entry]
+        Name=PsPixel
+        Comment=Professional Pixel Art Editor
+        Exec=PsPixel
+        Icon=pspixel
+        Terminal=false
+        Type=Application
+        Categories=Graphics;2DGraphics;RasterGraphics;
+        EOF
+        tar czf PsPixel-${{ steps.get_version.outputs.VERSION }}-linux-x86_64.tar.gz -C PsPixel-linux .
+
+    - name: Build .deb package
+      run: |
+        PKG=pspixel_${{ steps.get_version.outputs.SEMVER }}_amd64
+        mkdir -p $PKG/DEBIAN
+        mkdir -p $PKG/usr/bin
+        mkdir -p $PKG/usr/share/applications
+        mkdir -p $PKG/usr/share/icons/hicolor/256x256/apps
+        cp build/bin/PsPixel $PKG/usr/bin/
+        cp desktop/assets/icon.png $PKG/usr/share/icons/hicolor/256x256/apps/pspixel.png
+        cp PsPixel-linux/usr/share/applications/pspixel.desktop $PKG/usr/share/applications/
+        cat > $PKG/DEBIAN/control << EOF
+        Package: pspixel
+        Version: ${{ steps.get_version.outputs.SEMVER }}
+        Section: graphics
+        Priority: optional
+        Architecture: amd64
+        Depends: libqt6widgets6, libqt6gui6, libqt6core6
+        Maintainer: Jace Sleeman <thejacedev@users.noreply.github.com>
+        Description: Professional Pixel Art Editor
+         PsPixel is a professional pixel art editor with layers, tools,
+         symmetry drawing, and MCP server for AI-driven art creation.
+        EOF
+        dpkg-deb --build $PKG
+        mv ${PKG}.deb PsPixel-${{ steps.get_version.outputs.VERSION }}-amd64.deb
+
+    - name: Build .rpm package
+      run: |
+        mkdir -p rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
+        cat > rpmbuild/SPECS/pspixel.spec << EOF
+        Name: pspixel
+        Version: ${{ steps.get_version.outputs.SEMVER }}
+        Release: 1
+        Summary: Professional Pixel Art Editor
+        License: MIT
+        URL: https://github.com/thejacedev/PsPixel
+
+        %description
+        PsPixel is a professional pixel art editor with layers, tools,
+        symmetry drawing, and MCP server for AI-driven art creation.
+
+        %install
+        mkdir -p %{buildroot}/usr/bin
+        mkdir -p %{buildroot}/usr/share/applications
+        mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
+        cp %{_topdir}/../build/bin/PsPixel %{buildroot}/usr/bin/
+        cp %{_topdir}/../desktop/assets/icon.png %{buildroot}/usr/share/icons/hicolor/256x256/apps/pspixel.png
+        cp %{_topdir}/../PsPixel-linux/usr/share/applications/pspixel.desktop %{buildroot}/usr/share/applications/
+
+        %files
+        /usr/bin/PsPixel
+        /usr/share/applications/pspixel.desktop
+        /usr/share/icons/hicolor/256x256/apps/pspixel.png
+        EOF
+        rpmbuild --define "_topdir $(pwd)/rpmbuild" -bb rpmbuild/SPECS/pspixel.spec
+        cp rpmbuild/RPMS/x86_64/*.rpm PsPixel-${{ steps.get_version.outputs.VERSION }}-x86_64.rpm
+
+    - name: Build AppImage
+      run: |
+        # Download linuxdeploy
+        wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+        wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+        chmod +x linuxdeploy*.AppImage
+
+        # Create AppDir structure
+        mkdir -p AppDir/usr/bin
+        mkdir -p AppDir/usr/share/applications
+        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+        cp build/bin/PsPixel AppDir/usr/bin/
+        cp desktop/assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/pspixel.png
+        cp PsPixel-linux/usr/share/applications/pspixel.desktop AppDir/usr/share/applications/
+
+        # Build AppImage
+        export QMAKE=/usr/bin/qmake6 2>/dev/null || true
+        ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage || \
+        ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+        mv PsPixel*.AppImage PsPixel-${{ steps.get_version.outputs.VERSION }}-x86_64.AppImage
+
+    - name: Upload to release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        files: |
+          PsPixel-${{ steps.get_version.outputs.VERSION }}-linux-x86_64.tar.gz
+          PsPixel-${{ steps.get_version.outputs.VERSION }}-amd64.deb
+          PsPixel-${{ steps.get_version.outputs.VERSION }}-x86_64.rpm
+          PsPixel-${{ steps.get_version.outputs.VERSION }}-x86_64.AppImage
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.7.2'
+        target: 'desktop'
+        cache: true
+
+    - name: Build
+      run: |
+        cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$Qt6_DIR" desktop
+        ninja -C build
+
+    - name: Get version from tag
+      id: get_version
+      run: |
+        VERSION="${GITHUB_REF#refs/tags/}"
+        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+
+    - name: Create .app bundle
+      run: |
+        mkdir -p PsPixel.app/Contents/MacOS
+        mkdir -p PsPixel.app/Contents/Resources
+        cp build/bin/PsPixel PsPixel.app/Contents/MacOS/
+        cp desktop/assets/icon.png PsPixel.app/Contents/Resources/
+        cat > PsPixel.app/Contents/Info.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>PsPixel</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.thejacedev.pspixel</string>
+            <key>CFBundleName</key>
+            <string>PsPixel</string>
+            <key>CFBundleVersion</key>
+            <string>${{ steps.get_version.outputs.VERSION }}</string>
+            <key>CFBundleShortVersionString</key>
+            <string>${{ steps.get_version.outputs.VERSION }}</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+        </dict>
+        </plist>
+        EOF
+        macdeployqt PsPixel.app || true
+        zip -r PsPixel-${{ steps.get_version.outputs.VERSION }}-macos.zip PsPixel.app
+
+    - name: Upload to release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        files: PsPixel-${{ steps.get_version.outputs.VERSION }}-macos.zip
