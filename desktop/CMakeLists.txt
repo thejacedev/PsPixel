@@ -38,6 +38,8 @@ set(SOURCES
     src/ui/tools/rectangletool.cpp
     src/ui/tools/circletool.cpp
     src/ui/tools/selecttool.cpp
+    src/ui/tools/magicwandtool.cpp
+    src/ui/tools/lassotool.cpp
     src/ui/tools/toolmanager.cpp
     src/ui/tools/toolpalette.cpp
     src/ui/history/historymanager.cpp
@@ -113,6 +115,8 @@ qt6_add_resources(PsPixel "resources"
         assets/icons/rectangle.png
         assets/icons/circle.png
         assets/icons/select.png
+        assets/icons/magicwand.png
+        assets/icons/lasso.png
 )
 
 # Workaround Qt 6.7 + GCC 15 _Float16 multiple definition bug

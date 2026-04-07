@@ -16,6 +16,7 @@
 #include <QImage>
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QTimer>
 #include "constants.h"
 #include "../src/fileformat/pspxformat.h"
 
@@ -96,6 +97,8 @@ private:
     void loadCustomColors();
     void saveCustomColors();
     void setupColorDialog(QColorDialog &dialog);
+    void showToast(const QString &message);
+    void updateWindowTitle();
     
     // Core components
     PixelCanvas *m_canvas;
@@ -124,7 +127,13 @@ private:
     // Zoom controls
     ZoomBar *m_zoomBar;
     QPushButton *m_resetZoomButton;
-    
+
+    // Status bar info
+    QLabel *m_cursorPosLabel;
+    QLabel *m_canvasDimsLabel;
+    QLabel *m_toastLabel;
+    QTimer *m_toastTimer;
+
     // State
     QColor m_currentColor;
     ProjectData m_currentProject;

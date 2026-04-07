@@ -76,7 +76,8 @@ private:
     void createBrushSizeControls();
     void createColorControls();
     void createToolButton(ToolType toolType);
-    
+    void updateColorButtonAppearance(const QColor &color);
+
     ToolManager *m_toolManager;
     
     // UI elements

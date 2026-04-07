@@ -1,4 +1,5 @@
 #include "saveexportdialog.h"
+#include "constants.h"
 #include <QIcon>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -47,23 +48,23 @@ void SaveExportDialog::setupUI()
     nameLayout->addWidget(m_projectNameEdit);
     mainLayout->addLayout(nameLayout);
     
-    mainLayout->addSpacing(20);
-    
+    mainLayout->addSpacing(SPACING_LG);
+
     // Save project button
     m_saveProjectButton = new QPushButton(QIcon(":/assets/icons/save.png"), "Save Project (.pspx)");
     m_saveProjectButton->setToolTip("Save as .pspx project file to continue editing later");
-    m_saveProjectButton->setStyleSheet("QPushButton { text-align: left; padding: 10px; font-size: 12px; }");
+    m_saveProjectButton->setStyleSheet(QString("QPushButton { text-align: left; padding: %1px; font-size: %2px; }").arg(SPACING_MD).arg(FONT_SIZE_BODY));
     connect(m_saveProjectButton, &QPushButton::clicked, this, &SaveExportDialog::onSaveProject);
     mainLayout->addWidget(m_saveProjectButton);
-    
+
     // Export button
     m_exportImageButton = new QPushButton("Export Image (PNG/JPG/...)");
-    m_exportImageButton->setToolTip("Export as image file for sharing or printing");
-    m_exportImageButton->setStyleSheet("QPushButton { text-align: left; padding: 10px; font-size: 12px; }");
+    m_exportImageButton->setToolTip("Export as image file for sharing");
+    m_exportImageButton->setStyleSheet(QString("QPushButton { text-align: left; padding: %1px; font-size: %2px; }").arg(SPACING_MD).arg(FONT_SIZE_BODY));
     connect(m_exportImageButton, &QPushButton::clicked, this, &SaveExportDialog::onExportImage);
     mainLayout->addWidget(m_exportImageButton);
-    
-    mainLayout->addSpacing(20);
+
+    mainLayout->addSpacing(SPACING_LG);
     
     // Cancel button
     QHBoxLayout *buttonLayout = new QHBoxLayout();
@@ -79,7 +80,7 @@ void SaveExportDialog::setupUI()
         "<b>Export Image</b>: Creates final image files for sharing"
     );
     infoText->setWordWrap(true);
-    infoText->setStyleSheet("color: #666; font-size: 10px; margin-top: 10px;");
+    infoText->setStyleSheet(QString("color: palette(mid); font-size: %1px; margin-top: %2px;").arg(FONT_SIZE_CAPTION).arg(SPACING_MD));
     mainLayout->addWidget(infoText);
 }
 

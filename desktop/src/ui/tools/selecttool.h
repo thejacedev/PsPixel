@@ -17,22 +17,18 @@ public:
     ToolType getType() const override { return ToolType::Select; }
     QString getName() const override { return "Select"; }
     QString getIconPath() const override { return ":/assets/icons/select.png"; }
-    QString getTooltip() const override { return "Select Tool (V) - Select and move regions"; }
+    QString getTooltip() const override { return "Rectangular Select (V)\nDrag to select, then draw inside selection\nClick outside to deselect"; }
 
     void onMousePress(const QPoint &canvasPos, Qt::MouseButton button) override;
     void onMouseMove(const QPoint &canvasPos, Qt::MouseButtons buttons) override;
     void onMouseRelease(const QPoint &canvasPos, Qt::MouseButton button) override;
     void onDeactivate() override;
 
-    // For overlay rendering
-    bool hasSelection() const { return m_hasSelection; }
-    QRect selectionRect() const { return m_selectionRect; }
-
 private:
     enum class Phase { None, Selecting, Moving };
 
-    void commitSelection();
-    void clearSelection();
+    void applySelectionToCanvas();
+    void commitMove();
 
     Phase m_phase;
     bool m_hasSelection;

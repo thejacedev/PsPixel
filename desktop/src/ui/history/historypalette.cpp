@@ -22,15 +22,15 @@ void HistoryListItem::setIsCurrent(bool current)
     m_isCurrent = current;
     
     if (current) {
-        // Highlight current item
+        // Highlight current item with accent-derived color
         setBackground(QBrush(HISTORY_CURRENT_BG));
-        setForeground(QBrush(QColor(255, 255, 255)));
+        setForeground(QBrush(QApplication::palette().color(QPalette::HighlightedText)));
         QFont font = this->font();
         font.setBold(true);
         setFont(font);
     } else {
         // Reset to normal appearance
-        setBackground(QBrush(QColor(0, 0, 0, 0))); // Transparent
+        setBackground(QBrush(Qt::transparent));
         setForeground(QBrush(QApplication::palette().color(QPalette::Text)));
         QFont font = this->font();
         font.setBold(false);
@@ -91,42 +91,42 @@ void HistoryPalette::setupUI()
     
     // Main layout
     m_mainLayout = new QVBoxLayout(m_contentWidget);
-    m_mainLayout->setContentsMargins(8, 8, 8, 8);
-    m_mainLayout->setSpacing(8);
-    
+    m_mainLayout->setContentsMargins(SPACING_SM, SPACING_SM, SPACING_SM, SPACING_SM);
+    m_mainLayout->setSpacing(SPACING_SM);
+
     // Header section
     m_headerFrame = new QFrame();
     m_headerFrame->setFrameStyle(QFrame::StyledPanel | QFrame::Raised);
     m_headerFrame->setLineWidth(1);
-    
+
     m_headerLayout = new QVBoxLayout(m_headerFrame);
-    m_headerLayout->setContentsMargins(6, 6, 6, 6);
-    m_headerLayout->setSpacing(4);
-    
+    m_headerLayout->setContentsMargins(SPACING_XS, SPACING_XS, SPACING_XS, SPACING_XS);
+    m_headerLayout->setSpacing(SPACING_XS);
+
     // Title
     m_titleLabel = new QLabel("History");
-    m_titleLabel->setStyleSheet("font-weight: bold; font-size: 12px; color: palette(text);");
+    m_titleLabel->setStyleSheet(QString("font-weight: bold; font-size: %1px; color: palette(text);").arg(FONT_SIZE_BODY));
     m_titleLabel->setAlignment(Qt::AlignCenter);
     m_headerLayout->addWidget(m_titleLabel);
     
     // Clear button
     m_clearButton = new QPushButton("Clear All");
-    m_clearButton->setToolTip("Clear all history (Ctrl+Shift+Z)");
+    m_clearButton->setToolTip("Clear all history");
     m_clearButton->setMaximumHeight(24);
     m_clearButton->setStyleSheet(
-        "QPushButton {"
+        QString("QPushButton {"
         "    background-color: palette(button);"
         "    border: 1px solid palette(mid);"
-        "    border-radius: 3px;"
-        "    padding: 2px 8px;"
-        "    font-size: 10px;"
+        "    border-radius: %1px;"
+        "    padding: 2px %2px;"
+        "    font-size: %3px;"
         "}"
         "QPushButton:hover {"
         "    background-color: palette(light);"
         "}"
         "QPushButton:pressed {"
         "    background-color: palette(dark);"
-        "}"
+        "}").arg(RADIUS_CONTROL).arg(SPACING_SM).arg(FONT_SIZE_CAPTION)
     );
     connect(m_clearButton, &QPushButton::clicked, this, &HistoryPalette::onClearHistoryClicked);
     m_headerLayout->addWidget(m_clearButton);
@@ -143,16 +143,16 @@ void HistoryPalette::setupUI()
     
     // Style the list
     m_historyList->setStyleSheet(
-        "QListWidget {"
+        QString("QListWidget {"
         "    background-color: palette(base);"
         "    border: 1px solid palette(mid);"
-        "    border-radius: 3px;"
+        "    border-radius: %1px;"
         "    selection-background-color: palette(highlight);"
         "    selection-color: palette(highlighted-text);"
         "    outline: none;"
         "}"
         "QListWidget::item {"
-        "    padding: 4px 8px;"
+        "    padding: 4px %2px;"
         "    border-bottom: 1px solid palette(midlight);"
         "    min-height: 20px;"
         "}"
@@ -162,7 +162,7 @@ void HistoryPalette::setupUI()
         "QListWidget::item:selected {"
         "    background-color: palette(highlight);"
         "    color: palette(highlighted-text);"
-        "}"
+        "}").arg(RADIUS_CONTROL).arg(SPACING_SM)
     );
     
     // Connect list signals

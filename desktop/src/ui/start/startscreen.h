@@ -133,9 +133,11 @@ private slots:
     void onProjectThumbnailClicked(const QString &filePath);
     void onNewProjectClicked(int width, int height, int pixelSize, const QColor &backgroundColor);
 
+public:
+    void loadRecentProjects();
+
 private:
     void setupUI();
-    void loadRecentProjects();
     QPixmap generateThumbnail(const ProjectData &projectData, const QSize &size);
     
     QVBoxLayout *m_mainLayout;

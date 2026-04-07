@@ -8,6 +8,8 @@
 #include "rectangletool.h"
 #include "circletool.h"
 #include "selecttool.h"
+#include "magicwandtool.h"
+#include "lassotool.h"
 #include "pixelcanvas.h"
 #include <QLabel>
 
@@ -47,6 +49,8 @@ void ToolManager::initializeTools()
     m_tools[ToolType::Rectangle] = new RectangleTool(this);
     m_tools[ToolType::Circle] = new CircleTool(this);
     m_tools[ToolType::Select] = new SelectTool(this);
+    m_tools[ToolType::MagicWand] = new MagicWandTool(this);
+    m_tools[ToolType::Lasso] = new LassoTool(this);
     
     // Connect tool signals
     for (auto tool : m_tools) {
@@ -206,10 +210,10 @@ void ToolManager::createToolButton(ToolType toolType)
     button->setToolTip(tool->getTooltip());
     button->setText(tool->getName().left(1)); // Use first letter as icon for now
     button->setStyleSheet(
-        "QPushButton {"
+        QString("QPushButton {"
         "    border: 1px solid palette(mid);"
         "    background-color: palette(button);"
-        "    border-radius: 3px;"
+        "    border-radius: %1px;"
         "}"
         "QPushButton:checked {"
         "    background-color: palette(highlight);"
@@ -217,7 +221,7 @@ void ToolManager::createToolButton(ToolType toolType)
         "}"
         "QPushButton:hover {"
         "    background-color: palette(light);"
-        "}"
+        "}").arg(RADIUS_CONTROL)
     );
     
     // Connect button

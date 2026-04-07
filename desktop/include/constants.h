@@ -36,13 +36,46 @@ constexpr int DEFAULT_WINDOW_WIDTH = 1000;
 constexpr int DEFAULT_WINDOW_HEIGHT = 700;
 
 // Toolbar settings
-constexpr int TOOL_BUTTON_SIZE = 32;
+constexpr int TOOL_BUTTON_SIZE = 40;
 constexpr int TOOLBAR_SPACING = 5;
 constexpr int TOOLBAR_MARGIN = 10;
+
+// Design system: Accent colors
+const QColor ACCENT_COLOR(0, 120, 212);           // #0078d4
+const QColor ACCENT_HOVER(16, 110, 190);           // #106ebe
+const QColor ACCENT_PRESSED(0, 90, 158);           // #005a9e
+constexpr const char* ACCENT_HEX = "#0078d4";
+constexpr const char* ACCENT_HOVER_HEX = "#106ebe";
+constexpr const char* ACCENT_PRESSED_HEX = "#005a9e";
+
+// Design system: Accent-derived highlight colors
+const QColor ACCENT_LIGHT(0, 120, 212, 20);       // Hover overlays
+const QColor ACCENT_MEDIUM(0, 120, 212, 60);      // Active/selected backgrounds
+const QColor ACCENT_STRONG(0, 120, 212, 100);     // Emphasized highlights
+
+// Design system: Spacing scale
+constexpr int SPACING_XS = 5;
+constexpr int SPACING_SM = 8;
+constexpr int SPACING_MD = 10;
+constexpr int SPACING_LG = 15;
+
+// Design system: Border radius
+constexpr int RADIUS_PANEL = 5;
+constexpr int RADIUS_CONTROL = 3;
+
+// Design system: Font sizes
+constexpr int FONT_SIZE_TITLE = 16;
+constexpr int FONT_SIZE_BODY = 12;
+constexpr int FONT_SIZE_CAPTION = 10;
+
+// Design system: Disabled/secondary text
+const QColor TEXT_DISABLED(128, 128, 128);
 
 // Tool types
 enum class ToolType {
     Select,
+    MagicWand,
+    Lasso,
     Brush,
     Eraser,
     Eyedropper,
@@ -76,9 +109,9 @@ const QColor CHECKERBOARD_LIGHT(240, 240, 240);
 const QColor CHECKERBOARD_DARK(200, 200, 200);
 const QColor CANVAS_BACKGROUND(64, 64, 64);
 
-// History palette colors
-const QColor HISTORY_CURRENT_BG(100, 150, 200, 100);
-const QColor HISTORY_FUTURE_TEXT(128, 128, 128);
+// History palette colors (derived from accent tokens)
+const QColor HISTORY_CURRENT_BG = ACCENT_STRONG;
+const QColor HISTORY_FUTURE_TEXT = TEXT_DISABLED;
 
 // File filters
 constexpr const char* SAVE_FILE_FILTER = "PNG Files (*.png);;All Files (*)";

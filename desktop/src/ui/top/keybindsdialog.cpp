@@ -11,6 +11,8 @@ static QVector<KeyBinding> defaultBindings()
 {
     return {
         {"tool.select",     "Tools",  QKeySequence("V"), QKeySequence("V")},
+        {"tool.magicwand", "Tools",  QKeySequence("W"), QKeySequence("W")},
+        {"tool.lasso",     "Tools",  QKeySequence("A"), QKeySequence("A")},
         {"tool.brush",      "Tools",  QKeySequence("B"), QKeySequence("B")},
         {"tool.eraser",     "Tools",  QKeySequence("E"), QKeySequence("E")},
         {"tool.eyedropper", "Tools",  QKeySequence("I"), QKeySequence("I")},

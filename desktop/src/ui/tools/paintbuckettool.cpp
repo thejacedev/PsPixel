@@ -62,6 +62,9 @@ void PaintBucketTool::floodFill(int x, int y, const QColor &targetColor, const Q
         if (px < 0 || px >= w || py < 0 || py >= h) continue;
         if (img.pixel(px, py) != targetRgb) continue;
 
+        // Respect selection mask — only fill inside selected area
+        if (m_canvas->hasSelection() && !m_canvas->isPixelSelected(px, py)) continue;
+
         img.setPixel(px, py, fillRgb);
 
         stack.push(QPoint(px + 1, py));

@@ -91,12 +91,22 @@ public:
     void setLinePreviewStart(const QPoint &startPoint);
     void clearLinePreviewStart();
 
+    // Selection mask — persists across tool switches, gates pixel writes
+    void setSelectionMask(const QImage &mask);
+    void clearSelection();
+    bool hasSelection() const { return m_hasSelection; }
+    bool isPixelSelected(int x, int y) const;
+    const QImage& selectionMask() const { return m_selectionMask; }
+    QRect selectionBoundingRect() const;
+
     // History support
     QImage getCanvasState() const;
 
 signals:
     void zoomFactorChanged(double factor);
     void referenceImageChanged();
+    void cursorPositionChanged(int x, int y);
+    void cursorLeftCanvas();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -161,6 +171,10 @@ private:
     // Mirror/Symmetry state
     bool m_mirrorH;
     bool m_mirrorV;
+
+    // Selection mask (grayscale: 0 = unselected, 255 = selected)
+    QImage m_selectionMask;
+    bool m_hasSelection;
 
     // Reference image
     QImage m_refImage;

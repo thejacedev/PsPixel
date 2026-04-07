@@ -36,14 +36,14 @@ void ProjectThumbnail::paintEvent(QPaintEvent *event)
     
     // Draw hover effect
     if (m_hovered) {
-        painter.fillRect(rect(), QColor(0, 120, 215, 20));
+        painter.fillRect(rect(), ACCENT_LIGHT);
     }
     
     // Draw thumbnail
     QRect thumbnailRect = rect().adjusted(10, 10, -10, -40);
     if (!m_project.thumbnail.isNull()) {
         // Draw a subtle border around the thumbnail
-        painter.setPen(QPen(QColor(200, 200, 200), 1));
+        painter.setPen(QPen(CHECKERBOARD_DARK, 1));
         painter.drawRect(thumbnailRect);
         
         // Draw the thumbnail using nearest neighbor scaling to keep pixels crisp
@@ -60,7 +60,7 @@ void ProjectThumbnail::paintEvent(QPaintEvent *event)
         
         painter.drawPixmap(drawRect, scaledThumbnail);
     } else {
-        painter.fillRect(thumbnailRect, QColor(240, 240, 240));
+        painter.fillRect(thumbnailRect, CHECKERBOARD_LIGHT);
         painter.setPen(QColor(150, 150, 150));
         painter.drawText(thumbnailRect, Qt::AlignCenter, "No Preview");
     }
@@ -119,12 +119,12 @@ void NewProjectPanel::setupUI()
     setStyleSheet("QFrame { border: 1px solid palette(mid); background-color: palette(window); }");
     
     QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->setSpacing(15);
+    layout->setSpacing(SPACING_LG);
     layout->setContentsMargins(20, 20, 20, 20);
-    
+
     // Title
     QLabel *titleLabel = new QLabel("Create New Project");
-    titleLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: palette(windowText);");
+    titleLabel->setStyleSheet(QString("font-size: %1px; font-weight: bold; color: palette(windowText);").arg(FONT_SIZE_TITLE));
     layout->addWidget(titleLabel);
     
     // Presets
@@ -179,7 +179,7 @@ void NewProjectPanel::setupUI()
     QHBoxLayout *colorLayout = new QHBoxLayout();
     colorLayout->addWidget(new QLabel("Background:"));
     m_backgroundColorButton = new QPushButton("White");
-    m_backgroundColorButton->setStyleSheet("QPushButton { text-align: left; padding: 5px; }");
+    m_backgroundColorButton->setStyleSheet(QString("QPushButton { text-align: left; padding: %1px; }").arg(SPACING_XS));
     connect(m_backgroundColorButton, &QPushButton::clicked, this, &NewProjectPanel::onSelectBackgroundColor);
     colorLayout->addWidget(m_backgroundColorButton);
     
@@ -200,10 +200,12 @@ void NewProjectPanel::setupUI()
     // Create button
     m_createButton = new QPushButton("Create Project");
     m_createButton->setStyleSheet(
-        "QPushButton { background-color: #0078d4; color: white; padding: 10px; "
-        "border: none; border-radius: 3px; font-weight: bold; }"
-        "QPushButton:hover { background-color: #106ebe; }"
-        "QPushButton:pressed { background-color: #005a9e; }"
+        QString("QPushButton { background-color: %1; color: white; padding: %4px; "
+        "border: none; border-radius: %5px; font-weight: bold; }"
+        "QPushButton:hover { background-color: %2; }"
+        "QPushButton:pressed { background-color: %3; }")
+        .arg(ACCENT_HEX, ACCENT_HOVER_HEX, ACCENT_PRESSED_HEX)
+        .arg(SPACING_MD).arg(RADIUS_CONTROL)
     );
     connect(m_createButton, &QPushButton::clicked, this, &NewProjectPanel::onCreateProject);
     layout->addWidget(m_createButton);
@@ -509,12 +511,12 @@ void NewProjectPanel::updateBackgroundColorButton()
     QString buttonText;
     if (m_backgroundColor.alpha() == 0) {
         buttonText = "Transparent";
-        m_backgroundColorButton->setStyleSheet("QPushButton { text-align: left; padding: 5px; }");
+        m_backgroundColorButton->setStyleSheet(QString("QPushButton { text-align: left; padding: %1px; }").arg(SPACING_XS));
     } else {
         buttonText = m_backgroundColor.name();
-        m_backgroundColorButton->setStyleSheet(QString(
-            "QPushButton { text-align: left; padding: 5px; background-color: %1; }")
-            .arg(m_backgroundColor.name()));
+        m_backgroundColorButton->setStyleSheet(
+            QString("QPushButton { text-align: left; padding: %1px; background-color: %2; }")
+            .arg(SPACING_XS).arg(m_backgroundColor.name()));
     }
     m_backgroundColorButton->setText(buttonText);
 }
@@ -531,13 +533,13 @@ StartScreen::StartScreen(QWidget *parent)
 void StartScreen::setupUI()
 {
     m_mainLayout = new QVBoxLayout(this);
-    m_mainLayout->setSpacing(20);
-    m_mainLayout->setContentsMargins(40, 40, 40, 40);
+    m_mainLayout->setSpacing(SPACING_LG * 2);
+    m_mainLayout->setContentsMargins(SPACING_LG * 3, SPACING_LG * 3, SPACING_LG * 3, SPACING_LG * 3);
 
     // Header
     QHBoxLayout *headerLayout = new QHBoxLayout();
-    m_titleLabel = new QLabel("PixelPaint");
-    m_titleLabel->setStyleSheet("font-size: 28px; font-weight: bold; color: palette(windowText);");
+    m_titleLabel = new QLabel(APP_NAME);
+    m_titleLabel->setStyleSheet(QString("font-size: %1px; font-weight: bold; color: palette(windowText);").arg(FONT_SIZE_TITLE * 2));
     headerLayout->addWidget(m_titleLabel);
     headerLayout->addStretch();
     m_mainLayout->addLayout(headerLayout);
@@ -548,7 +550,8 @@ void StartScreen::setupUI()
     // Recent projects section
     QVBoxLayout *recentSection = new QVBoxLayout();
     m_recentLabel = new QLabel("Recent Projects");
-    m_recentLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: palette(windowText); margin-bottom: 10px;");
+    m_recentLabel->setStyleSheet(QString("font-size: %1px; font-weight: bold; color: palette(windowText); margin-bottom: %2px;")
+        .arg(FONT_SIZE_TITLE + 2).arg(SPACING_MD));
     recentSection->addWidget(m_recentLabel);
 
     m_recentProjectsArea = new QScrollArea();
@@ -559,7 +562,7 @@ void StartScreen::setupUI()
 
     QWidget *projectsWidget = new QWidget();
     m_projectsGrid = new QGridLayout(projectsWidget);
-    m_projectsGrid->setSpacing(15);
+    m_projectsGrid->setSpacing(SPACING_LG);
     m_recentProjectsArea->setWidget(projectsWidget);
 
     recentSection->addWidget(m_recentProjectsArea);
@@ -637,9 +640,9 @@ void StartScreen::refreshRecentProjects()
     
     // Show message if no recent projects
     if (m_recentProjects.isEmpty()) {
-        QLabel *noProjectsLabel = new QLabel("No recent projects.\nCreate a new project to get started!");
+        QLabel *noProjectsLabel = new QLabel("Your canvas awaits.\nCreate a new project to start something great.");
         noProjectsLabel->setAlignment(Qt::AlignCenter);
-        noProjectsLabel->setStyleSheet("color: palette(windowText); font-size: 14px;");
+        noProjectsLabel->setStyleSheet(QString("color: palette(mid); font-size: 14px; padding: 40px;"));
         m_projectsGrid->addWidget(noProjectsLabel, 0, 0, 1, maxCols);
     }
 }

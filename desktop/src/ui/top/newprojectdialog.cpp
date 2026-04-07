@@ -1,4 +1,5 @@
 #include "newprojectdialog.h"
+#include "constants.h"
 #include <QIcon>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -25,23 +26,25 @@ void NewProjectDialog::setupUI()
     
     // Title
     QLabel *titleLabel = new QLabel("Create New Project");
-    titleLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: palette(windowText); margin-bottom: 10px;");
+    titleLabel->setStyleSheet(QString("font-size: %1px; font-weight: bold; color: palette(windowText); margin-bottom: %2px;").arg(FONT_SIZE_TITLE).arg(SPACING_MD));
     mainLayout->addWidget(titleLabel);
     
     // Info label
     QLabel *infoLabel = new QLabel("Choose how to create your new project:");
     infoLabel->setWordWrap(true);
-    infoLabel->setStyleSheet("color: palette(text); margin-bottom: 20px;");
+    infoLabel->setStyleSheet(QString("color: palette(text); font-size: %1px; margin-bottom: 20px;").arg(FONT_SIZE_BODY));
     mainLayout->addWidget(infoLabel);
     
     // Start screen button
     m_showStartScreenButton = new QPushButton(QIcon(":/assets/icons/home.png"), "Go to Start Screen");
     m_showStartScreenButton->setToolTip("Return to the start screen to create a new project with preset options");
     m_showStartScreenButton->setStyleSheet(
-        "QPushButton { text-align: left; padding: 15px; font-size: 12px; "
-        "background-color: #0078d4; color: white; border: none; border-radius: 3px; font-weight: bold; }"
-        "QPushButton:hover { background-color: #106ebe; }"
-        "QPushButton:pressed { background-color: #005a9e; }"
+        QString("QPushButton { text-align: left; padding: %4px; font-size: %5px; "
+        "background-color: %1; color: white; border: none; border-radius: %6px; font-weight: bold; }"
+        "QPushButton:hover { background-color: %2; }"
+        "QPushButton:pressed { background-color: %3; }")
+        .arg(ACCENT_HEX, ACCENT_HOVER_HEX, ACCENT_PRESSED_HEX)
+        .arg(SPACING_LG).arg(FONT_SIZE_BODY).arg(RADIUS_CONTROL)
     );
     connect(m_showStartScreenButton, &QPushButton::clicked, this, &NewProjectDialog::onShowStartScreen);
     mainLayout->addWidget(m_showStartScreenButton);
@@ -49,7 +52,7 @@ void NewProjectDialog::setupUI()
     // Quick create button
     m_createNewButton = new QPushButton(QIcon(":/assets/icons/bolt.png"), "Quick Create (64x64)");
     m_createNewButton->setToolTip("Quickly create a new 64x64 project with default settings");
-    m_createNewButton->setStyleSheet("QPushButton { text-align: left; padding: 15px; font-size: 12px; }");
+    m_createNewButton->setStyleSheet(QString("QPushButton { text-align: left; padding: %1px; font-size: %2px; }").arg(SPACING_LG).arg(FONT_SIZE_BODY));
     connect(m_createNewButton, &QPushButton::clicked, this, &NewProjectDialog::onCreateNewProject);
     mainLayout->addWidget(m_createNewButton);
     
@@ -69,7 +72,7 @@ void NewProjectDialog::setupUI()
         "<b>Quick Create</b>: Fast setup with common defaults"
     );
     infoText->setWordWrap(true);
-    infoText->setStyleSheet("color: #666; font-size: 10px; margin-top: 10px;");
+    infoText->setStyleSheet(QString("color: palette(mid); font-size: %1px; margin-top: %2px;").arg(FONT_SIZE_CAPTION).arg(SPACING_MD));
     mainLayout->addWidget(infoText);
 }
 

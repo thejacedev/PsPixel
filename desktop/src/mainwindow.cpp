@@ -48,6 +48,10 @@ MainWindow::MainWindow(QWidget *parent)
     , m_statusBarLayout(nullptr)
     , m_zoomBar(nullptr)
     , m_resetZoomButton(nullptr)
+    , m_cursorPosLabel(nullptr)
+    , m_canvasDimsLabel(nullptr)
+    , m_toastLabel(nullptr)
+    , m_toastTimer(nullptr)
     , m_currentColor(Qt::black)
     , m_projectModified(false)
     , m_updater(nullptr)
@@ -210,6 +214,14 @@ void MainWindow::setupMenuBar()
 
     editMenu->addSeparator();
 
+    QAction *deselectAction = editMenu->addAction("Deselect");
+    deselectAction->setShortcut(QKeySequence("Ctrl+D"));
+    connect(deselectAction, &QAction::triggered, this, [this]() {
+        if (m_canvas) m_canvas->clearSelection();
+    });
+
+    editMenu->addSeparator();
+
     QAction *copyAction = editMenu->addAction("Copy");
     copyAction->setShortcut(QKeySequence::Copy);
     connect(copyAction, &QAction::triggered, this, &MainWindow::copySelection);
@@ -245,19 +257,23 @@ void MainWindow::setupMenuBar()
     
     viewMenu->addSeparator();
     
-    QAction *toggleToolPaletteAction = viewMenu->addAction("Toggle Tool Palette");
+    QAction *toggleToolPaletteAction = viewMenu->addAction("Tools Panel");
+    toggleToolPaletteAction->setCheckable(true);
+    toggleToolPaletteAction->setChecked(true);
     toggleToolPaletteAction->setShortcut(QKeySequence("F1"));
-    connect(toggleToolPaletteAction, &QAction::triggered, this, [this]() {
+    connect(toggleToolPaletteAction, &QAction::triggered, this, [this](bool checked) {
         if (m_toolPalette) {
-            m_toolPalette->setVisible(!m_toolPalette->isVisible());
+            m_toolPalette->setVisible(checked);
         }
     });
-    
-    QAction *toggleHistoryPaletteAction = viewMenu->addAction("Toggle History Palette");
+
+    QAction *toggleHistoryPaletteAction = viewMenu->addAction("History Panel");
+    toggleHistoryPaletteAction->setCheckable(true);
+    toggleHistoryPaletteAction->setChecked(true);
     toggleHistoryPaletteAction->setShortcut(QKeySequence("F2"));
-    connect(toggleHistoryPaletteAction, &QAction::triggered, this, [this]() {
+    connect(toggleHistoryPaletteAction, &QAction::triggered, this, [this](bool checked) {
         if (m_historyPalette) {
-            m_historyPalette->setVisible(!m_historyPalette->isVisible());
+            m_historyPalette->setVisible(checked);
         }
     });
     
@@ -281,15 +297,15 @@ void MainWindow::setupMenuBar()
 
     QMenu *refMenu = viewMenu->addMenu("Reference Image");
 
-    QAction *loadRefAction = refMenu->addAction("Load...");
+    QAction *loadRefAction = refMenu->addAction("Open...");
     connect(loadRefAction, &QAction::triggered, this, [this]() {
         if (!m_canvas) return;
-        QString file = QFileDialog::getOpenFileName(this, "Load Reference Image", "",
+        QString file = QFileDialog::getOpenFileName(this, "Open Reference Image", "",
             "Images (*.png *.jpg *.jpeg *.bmp);;All Files (*)");
         if (!file.isEmpty()) m_canvas->loadReferenceImage(file);
     });
 
-    QAction *clearRefAction = refMenu->addAction("Clear");
+    QAction *clearRefAction = refMenu->addAction("Remove");
     connect(clearRefAction, &QAction::triggered, this, [this]() {
         if (m_canvas) m_canvas->clearReferenceImage();
     });
@@ -333,6 +349,8 @@ void MainWindow::setupMenuBar()
     };
 
     addToolShortcut("tool.select",     ToolType::Select);
+    addToolShortcut("tool.magicwand", ToolType::MagicWand);
+    addToolShortcut("tool.lasso",     ToolType::Lasso);
     addToolShortcut("tool.brush",      ToolType::Brush);
     addToolShortcut("tool.eraser",     ToolType::Eraser);
     addToolShortcut("tool.eyedropper", ToolType::Eyedropper);
@@ -372,17 +390,56 @@ void MainWindow::setupMenuBar()
 void MainWindow::createStatusBar()
 {
     m_statusBarLayout = new QHBoxLayout();
-    
-    // Zoom controls
+    m_statusBarLayout->setContentsMargins(SPACING_SM, 2, SPACING_SM, 2);
+
+    QString statusLabelStyle = QString("font-size: %1px; color: palette(text); padding: 0 %2px;")
+        .arg(FONT_SIZE_CAPTION).arg(SPACING_XS);
+    QString separatorStyle = QString("color: palette(mid); font-size: %1px;").arg(FONT_SIZE_CAPTION);
+
+    // Cursor position (left side)
+    m_cursorPosLabel = new QLabel("");
+    m_cursorPosLabel->setStyleSheet(statusLabelStyle);
+    m_cursorPosLabel->setMinimumWidth(80);
+    m_statusBarLayout->addWidget(m_cursorPosLabel);
+
+    // Separator
+    QLabel *sep1 = new QLabel("|");
+    sep1->setStyleSheet(separatorStyle);
+    m_statusBarLayout->addWidget(sep1);
+
+    // Canvas dimensions
+    m_canvasDimsLabel = new QLabel("");
+    m_canvasDimsLabel->setStyleSheet(statusLabelStyle);
+    m_statusBarLayout->addWidget(m_canvasDimsLabel);
+
+    // Separator
+    QLabel *sep2 = new QLabel("|");
+    sep2->setStyleSheet(separatorStyle);
+    m_statusBarLayout->addWidget(sep2);
+
+    // Toast message area (auto-fading status messages)
+    m_toastLabel = new QLabel("");
+    m_toastLabel->setStyleSheet(QString("font-size: %1px; color: %2; font-weight: bold; padding: 0 %3px;")
+        .arg(FONT_SIZE_CAPTION).arg(ACCENT_HEX).arg(SPACING_XS));
+    m_statusBarLayout->addWidget(m_toastLabel);
+
+    m_toastTimer = new QTimer(this);
+    m_toastTimer->setSingleShot(true);
+    connect(m_toastTimer, &QTimer::timeout, this, [this]() {
+        m_toastLabel->clear();
+    });
+
+    m_statusBarLayout->addStretch();
+
+    // Zoom controls (right side)
     m_zoomBar = new ZoomBar();
     connect(m_zoomBar, &ZoomBar::zoomChanged, this, &MainWindow::onZoomBarChanged);
-    
+
     m_resetZoomButton = new QPushButton("Reset Zoom");
     m_resetZoomButton->setToolTip("Reset Zoom (Ctrl+0)");
+    m_resetZoomButton->setStyleSheet(QString("font-size: %1px;").arg(FONT_SIZE_CAPTION));
     connect(m_resetZoomButton, &QPushButton::clicked, this, &MainWindow::resetZoom);
-    
-    // Add widgets to status bar layout
-    m_statusBarLayout->addStretch(); // Push everything to the right
+
     m_statusBarLayout->addWidget(m_zoomBar);
     m_statusBarLayout->addWidget(m_resetZoomButton);
 }
@@ -402,6 +459,7 @@ void MainWindow::setupConnections()
         connect(m_toolManager, &ToolManager::colorPicked, this, &MainWindow::onColorSelected);
         connect(m_toolManager, &ToolManager::canvasModified, this, [this]() {
             m_projectModified = true;
+            updateWindowTitle();
         });
         connect(m_toolManager, &ToolManager::toolChanged, this, [this](ToolType toolType) {
             if (m_toolPalette) {
@@ -412,6 +470,18 @@ void MainWindow::setupConnections()
     
     // Connect canvas zoom changes to update zoom bar
     connect(m_canvas, &PixelCanvas::zoomFactorChanged, this, &MainWindow::updateZoomBar);
+
+    // Connect cursor position for status bar display
+    connect(m_canvas, &PixelCanvas::cursorPositionChanged, this, [this](int x, int y) {
+        if (m_cursorPosLabel) {
+            m_cursorPosLabel->setText(QString("X: %1  Y: %2").arg(x).arg(y));
+        }
+    });
+    connect(m_canvas, &PixelCanvas::cursorLeftCanvas, this, [this]() {
+        if (m_cursorPosLabel) {
+            m_cursorPosLabel->setText("");
+        }
+    });
     
     // Connect history manager signals
     if (m_historyManager) {
@@ -565,8 +635,7 @@ void MainWindow::newProject()
             m_historyManager->saveState(m_canvas->getCanvasState(), "New Project");
         }
         
-        // Update window title to show we have a new project
-        setWindowTitle(QString("%1 - %2 - New Project").arg(APP_NAME, APP_DESCRIPTION));
+        updateWindowTitle();
     }
 }
 
@@ -601,14 +670,12 @@ void MainWindow::saveProject()
         projectData.modifiedTimestamp = QDateTime::currentSecsSinceEpoch();
         
         if (PSPXFormat::saveProject(fileName, projectData)) {
-            QMessageBox::information(this, "Success", "Project saved successfully!");
+            showToast(QString("Saved \u2014 %1").arg(projectData.projectName));
             m_projectModified = false;
             m_currentProjectPath = fileName;
-            m_currentProject = projectData; // Update current project data
+            m_currentProject = projectData;
             addToRecentProjects(fileName);
-            
-            // Update window title
-            setWindowTitle(QString("%1 - %2 - %3").arg(APP_NAME, APP_DESCRIPTION, projectData.projectName));
+            updateWindowTitle();
         } else {
             QMessageBox::warning(this, "Error", "Failed to save project!");
         }
@@ -621,7 +688,7 @@ void MainWindow::exportImage()
     
     if (!fileName.isEmpty()) {
         if (m_canvas->saveImage(fileName)) {
-            QMessageBox::information(this, "Success", "Image exported successfully!");
+            showToast(QString("Exported \u2014 %1").arg(QFileInfo(fileName).fileName()));
         } else {
             QMessageBox::warning(this, "Error", "Failed to export image!");
         }
@@ -651,14 +718,13 @@ void MainWindow::exportAllLayers()
         }
     }
 
-    QMessageBox::information(this, "Export Layers",
-        QString("Exported %1 of %2 layers to:\n%3").arg(exported).arg(m_layerManager2->layerCount()).arg(dir));
+    showToast(QString("Exported %1 of %2 layers").arg(exported).arg(m_layerManager2->layerCount()));
 }
 
 void MainWindow::loadProject()
 {
     QString fileName = QFileDialog::getOpenFileName(this,
-        "Open Project", "AppData/Projects", "PixelPaint Project Files (*.pspx);;All Files (*)");
+        "Open Project", "", "PsPixel Project Files (*.pspx);;All Files (*)");
     
     if (!fileName.isEmpty()) {
         ProjectData projectData;
@@ -673,16 +739,15 @@ void MainWindow::loadProject()
             m_currentProjectPath = fileName;
             m_projectModified = false;
             
-            // Update window title
-            setWindowTitle(QString("%1 - %2 - %3").arg(APP_NAME, APP_DESCRIPTION, projectData.projectName));
-            
+            updateWindowTitle();
+
             // Clear history and save initial state
             if (m_historyManager) {
                 m_historyManager->clearHistory();
                 m_historyManager->saveState(m_canvas->getCanvasState(), "Project Loaded");
             }
-            
-            QMessageBox::information(this, "Success", "Project loaded successfully!");
+
+            showToast(QString("Opened \u2014 %1").arg(projectData.projectName));
         } else {
             QMessageBox::warning(this, "Error", "Failed to load project!");
         }
@@ -767,6 +832,34 @@ void MainWindow::updateZoomBar()
         const double zoomFactor = m_canvas->getZoomFactor();
         m_zoomBar->setZoomLevel(static_cast<int>(zoomFactor * 100));
     }
+    // Also update canvas dimensions display
+    if (m_canvas && m_canvasDimsLabel) {
+        m_canvasDimsLabel->setText(QString("%1 \u00d7 %2 px")
+            .arg(m_canvas->getCanvasWidth())
+            .arg(m_canvas->getCanvasHeight()));
+    }
+}
+
+void MainWindow::showToast(const QString &message)
+{
+    if (m_toastLabel) {
+        m_toastLabel->setText(message);
+        m_toastTimer->start(3000);
+    }
+}
+
+void MainWindow::updateWindowTitle()
+{
+    QString title = APP_NAME;
+    if (!m_currentProjectPath.isEmpty()) {
+        title += QString(" \u2014 %1").arg(QFileInfo(m_currentProjectPath).baseName());
+    } else if (m_canvas) {
+        title += QString(" \u2014 New Project");
+    }
+    if (m_projectModified) {
+        title += " \u2022"; // bullet indicates unsaved
+    }
+    setWindowTitle(title);
 }
 
 void MainWindow::onZoomBarChanged(int value)
@@ -785,32 +878,40 @@ bool MainWindow::shouldShowStartScreen()
 
 void MainWindow::showStartScreen()
 {
+    // Take the current central widget so Qt doesn't delete it
+    takeCentralWidget();
+
     if (!m_startScreen) {
-        m_startScreen = new StartScreen();
+        m_startScreen = new StartScreen(this);
         connect(m_startScreen, &StartScreen::projectSelected,
                 this, &MainWindow::onStartScreenProjectSelected);
         connect(m_startScreen, &StartScreen::newProjectRequested,
                 this, &MainWindow::onStartScreenNewProject);
     }
+    m_startScreen->loadRecentProjects();
+
+    // Hide editor dock widgets while on start screen
+    if (m_toolPalette) m_toolPalette->hide();
+    if (m_historyPalette) m_historyPalette->hide();
+    if (m_layerPalette) m_layerPalette->hide();
 
     setCentralWidget(m_startScreen);
 }
 
 void MainWindow::showMainInterface()
 {
+    // Take the current central widget so Qt doesn't delete it
+    takeCentralWidget();
+
     if (!m_canvas) {
         setupUI();
         setupConnections();
-    } else if (!m_centralWidget) {
-        // Central widget was taken by setCentralWidget(startScreen), recreate UI
-        m_canvas = nullptr;
-        m_mainLayout = nullptr;
-        m_statusBarLayout = nullptr;
-        m_zoomBar = nullptr;
-        m_toolPalette = nullptr;
-        setupUI();
-        setupConnections();
     }
+
+    // Restore editor dock widgets
+    if (m_toolPalette) m_toolPalette->show();
+    if (m_historyPalette) m_historyPalette->show();
+    if (m_layerPalette) m_layerPalette->show();
 
     setCentralWidget(m_centralWidget);
 }
@@ -829,7 +930,7 @@ void MainWindow::onStartScreenProjectSelected(const QString &filePath)
         m_currentProjectPath = filePath;
         m_projectModified = false;
 
-        setWindowTitle(QString("%1 - %2 - %3").arg(APP_NAME, APP_DESCRIPTION, projectData.projectName));
+        updateWindowTitle();
         addToRecentProjects(filePath);
 
         if (m_historyManager) {
@@ -837,7 +938,7 @@ void MainWindow::onStartScreenProjectSelected(const QString &filePath)
             m_historyManager->saveState(m_canvas->getCanvasState(), "Project Loaded");
         }
 
-        QMessageBox::information(this, "Success", "Project loaded successfully!");
+        showToast(QString("Opened \u2014 %1").arg(projectData.projectName));
     } else {
         QMessageBox::warning(this, "Error", "Failed to load project!");
     }
@@ -988,14 +1089,11 @@ void MainWindow::rotateCCW()
 
 void MainWindow::copySelection()
 {
-    if (!m_canvas || !m_toolManager) return;
-    BaseTool *tool = m_toolManager->getCurrentTool();
-    if (!tool || tool->getType() != ToolType::Select) return;
+    if (!m_canvas || !m_canvas->hasSelection()) return;
 
-    auto *selectTool = static_cast<SelectTool*>(tool);
-    if (!selectTool->hasSelection()) return;
+    QRect sel = m_canvas->selectionBoundingRect();
+    if (sel.isEmpty()) return;
 
-    QRect sel = selectTool->selectionRect();
     m_clipboard = m_canvas->canvasImage().copy(sel);
 }
 

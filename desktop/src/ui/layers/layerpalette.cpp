@@ -1,6 +1,7 @@
 #include "layerpalette.h"
 #include "layermanager.h"
 #include "pixelcanvas.h"
+#include "constants.h"
 #include <QInputDialog>
 #include <QApplication>
 
@@ -40,12 +41,14 @@ void LayerPalette::setupUI()
     setWidget(content);
 
     QVBoxLayout *layout = new QVBoxLayout(content);
-    layout->setContentsMargins(8, 8, 8, 8);
-    layout->setSpacing(6);
+    layout->setContentsMargins(SPACING_SM, SPACING_SM, SPACING_SM, SPACING_SM);
+    layout->setSpacing(SPACING_SM);
 
     // Opacity slider
     QHBoxLayout *opacityLayout = new QHBoxLayout();
-    opacityLayout->addWidget(new QLabel("Opacity:"));
+    QLabel *opacityLabel = new QLabel("Opacity:");
+    opacityLabel->setStyleSheet(QString("font-size: %1px;").arg(FONT_SIZE_BODY));
+    opacityLayout->addWidget(opacityLabel);
     m_opacitySlider = new QSlider(Qt::Horizontal);
     m_opacitySlider->setRange(0, 100);
     m_opacitySlider->setValue(100);
@@ -53,46 +56,94 @@ void LayerPalette::setupUI()
     opacityLayout->addWidget(m_opacitySlider);
     m_opacityLabel = new QLabel("100%");
     m_opacityLabel->setFixedWidth(40);
+    m_opacityLabel->setStyleSheet(QString("font-size: %1px;").arg(FONT_SIZE_BODY));
     opacityLayout->addWidget(m_opacityLabel);
     layout->addLayout(opacityLayout);
 
     // Layer list (top = front, bottom = back)
     m_layerList = new QListWidget();
     m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_layerList->setAlternatingRowColors(true);
+    m_layerList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    m_layerList->setStyleSheet(
+        QString("QListWidget {"
+        "    background-color: palette(base);"
+        "    border: 1px solid palette(mid);"
+        "    border-radius: %1px;"
+        "    selection-background-color: palette(highlight);"
+        "    selection-color: palette(highlighted-text);"
+        "    outline: none;"
+        "}"
+        "QListWidget::item {"
+        "    padding: 4px %2px;"
+        "    border-bottom: 1px solid palette(midlight);"
+        "    min-height: 20px;"
+        "}"
+        "QListWidget::item:hover {"
+        "    background-color: palette(light);"
+        "}"
+        "QListWidget::item:selected {"
+        "    background-color: palette(highlight);"
+        "    color: palette(highlighted-text);"
+        "}").arg(RADIUS_CONTROL).arg(SPACING_SM)
+    );
     connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPalette::onLayerClicked);
     connect(m_layerList, &QListWidget::itemChanged, this, &LayerPalette::onVisibilityToggled);
     layout->addWidget(m_layerList, 1);
 
     // Buttons
     QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->setSpacing(SPACING_XS);
+
+    QString layerButtonStyle = QString(
+        "QPushButton {"
+        "    background-color: palette(button);"
+        "    border: 1px solid palette(mid);"
+        "    border-radius: %1px;"
+        "    padding: 2px;"
+        "    font-size: %2px;"
+        "    font-weight: bold;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: palette(light);"
+        "    border: 1px solid palette(highlight);"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: palette(dark);"
+        "}").arg(RADIUS_CONTROL).arg(FONT_SIZE_BODY);
 
     m_addButton = new QPushButton("+");
     m_addButton->setToolTip("Add Layer");
     m_addButton->setMaximumWidth(30);
+    m_addButton->setStyleSheet(layerButtonStyle);
     connect(m_addButton, &QPushButton::clicked, this, &LayerPalette::onAddLayer);
     buttonLayout->addWidget(m_addButton);
 
     m_removeButton = new QPushButton("-");
     m_removeButton->setToolTip("Remove Layer");
     m_removeButton->setMaximumWidth(30);
+    m_removeButton->setStyleSheet(layerButtonStyle);
     connect(m_removeButton, &QPushButton::clicked, this, &LayerPalette::onRemoveLayer);
     buttonLayout->addWidget(m_removeButton);
 
     m_duplicateButton = new QPushButton("D");
     m_duplicateButton->setToolTip("Duplicate Layer");
     m_duplicateButton->setMaximumWidth(30);
+    m_duplicateButton->setStyleSheet(layerButtonStyle);
     connect(m_duplicateButton, &QPushButton::clicked, this, &LayerPalette::onDuplicateLayer);
     buttonLayout->addWidget(m_duplicateButton);
 
     m_upButton = new QPushButton("^");
     m_upButton->setToolTip("Move Layer Up");
     m_upButton->setMaximumWidth(30);
+    m_upButton->setStyleSheet(layerButtonStyle);
     connect(m_upButton, &QPushButton::clicked, this, &LayerPalette::onMoveUp);
     buttonLayout->addWidget(m_upButton);
 
     m_downButton = new QPushButton("v");
     m_downButton->setToolTip("Move Layer Down");
     m_downButton->setMaximumWidth(30);
+    m_downButton->setStyleSheet(layerButtonStyle);
     connect(m_downButton, &QPushButton::clicked, this, &LayerPalette::onMoveDown);
     buttonLayout->addWidget(m_downButton);
 
@@ -116,11 +167,11 @@ void LayerPalette::refreshList()
         refItem->setFlags(refItem->flags() | Qt::ItemIsUserCheckable);
         refItem->setCheckState(Qt::Checked);
         refItem->setData(Qt::UserRole, -1); // special index
-        refItem->setForeground(QBrush(QColor(0, 120, 215)));
+        refItem->setForeground(QBrush(ACCENT_COLOR));
         QFont f = refItem->font();
         f.setItalic(true);
         if (refActive) {
-            refItem->setBackground(QBrush(QColor(0, 120, 215, 60)));
+            refItem->setBackground(QBrush(ACCENT_MEDIUM));
             f.setBold(true);
         }
         refItem->setFont(f);
@@ -137,7 +188,7 @@ void LayerPalette::refreshList()
         item->setData(Qt::UserRole, i);
 
         if (!refActive && i == m_layerManager->activeLayerIndex()) {
-            item->setBackground(QBrush(QColor(100, 150, 200, 100)));
+            item->setBackground(QBrush(ACCENT_STRONG));
             QFont f = item->font();
             f.setBold(true);
             item->setFont(f);

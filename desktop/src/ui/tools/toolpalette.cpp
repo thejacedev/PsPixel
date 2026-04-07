@@ -45,8 +45,8 @@ void ToolPalette::setupUI()
     setWidget(m_contentWidget);
     
     m_mainLayout = new QVBoxLayout(m_contentWidget);
-    m_mainLayout->setSpacing(10);
-    m_mainLayout->setContentsMargins(8, 8, 8, 8);
+    m_mainLayout->setSpacing(SPACING_MD);
+    m_mainLayout->setContentsMargins(SPACING_SM, SPACING_SM, SPACING_SM, SPACING_SM);
     
     // Create sections
     createToolButtons();
@@ -68,21 +68,21 @@ void ToolPalette::createToolButtons()
     m_toolsFrame = new QFrame();
     m_toolsFrame->setFrameStyle(QFrame::StyledPanel);
     m_toolsFrame->setStyleSheet(
-        "QFrame {"
+        QString("QFrame {"
         "    background-color: palette(window);"
         "    border: 1px solid palette(mid);"
-        "    border-radius: 5px;"
-        "    padding: 5px;"
-        "}"
+        "    border-radius: %1px;"
+        "    padding: %2px;"
+        "}").arg(RADIUS_PANEL).arg(SPACING_XS)
     );
-    
+
     QVBoxLayout *toolsFrameLayout = new QVBoxLayout(m_toolsFrame);
-    toolsFrameLayout->setSpacing(5);
-    toolsFrameLayout->setContentsMargins(5, 5, 5, 5);
-    
+    toolsFrameLayout->setSpacing(SPACING_XS);
+    toolsFrameLayout->setContentsMargins(SPACING_XS, SPACING_XS, SPACING_XS, SPACING_XS);
+
     // Tools title
     QLabel *toolsTitle = new QLabel("Tools");
-    toolsTitle->setStyleSheet("font-weight: bold; color: palette(text); border: none;");
+    toolsTitle->setStyleSheet(QString("font-weight: bold; font-size: %1px; color: palette(text); border: none;").arg(FONT_SIZE_BODY));
     toolsTitle->setAlignment(Qt::AlignCenter);
     toolsFrameLayout->addWidget(toolsTitle);
     
@@ -95,6 +95,8 @@ void ToolPalette::createToolButtons()
     // Create tool buttons
     if (m_toolManager) {
         createToolButton(ToolType::Select);
+        createToolButton(ToolType::MagicWand);
+        createToolButton(ToolType::Lasso);
         createToolButton(ToolType::Brush);
         createToolButton(ToolType::Eraser);
         createToolButton(ToolType::Eyedropper);
@@ -119,27 +121,27 @@ void ToolPalette::createBrushSizeControls()
     m_brushFrame = new QFrame();
     m_brushFrame->setFrameStyle(QFrame::StyledPanel);
     m_brushFrame->setStyleSheet(
-        "QFrame {"
+        QString("QFrame {"
         "    background-color: palette(window);"
         "    border: 1px solid palette(mid);"
-        "    border-radius: 5px;"
-        "    padding: 5px;"
-        "}"
+        "    border-radius: %1px;"
+        "    padding: %2px;"
+        "}").arg(RADIUS_PANEL).arg(SPACING_XS)
     );
-    
+
     m_brushLayout = new QVBoxLayout(m_brushFrame);
-    m_brushLayout->setSpacing(5);
-    m_brushLayout->setContentsMargins(5, 5, 5, 5);
-    
+    m_brushLayout->setSpacing(SPACING_XS);
+    m_brushLayout->setContentsMargins(SPACING_XS, SPACING_XS, SPACING_XS, SPACING_XS);
+
     // Brush title
     QLabel *brushTitle = new QLabel("Brush");
-    brushTitle->setStyleSheet("font-weight: bold; color: palette(text); border: none;");
+    brushTitle->setStyleSheet(QString("font-weight: bold; font-size: %1px; color: palette(text); border: none;").arg(FONT_SIZE_BODY));
     brushTitle->setAlignment(Qt::AlignCenter);
     m_brushLayout->addWidget(brushTitle);
     
     // Brush size
     m_brushSizeLabel = new QLabel("Size:");
-    m_brushSizeLabel->setStyleSheet("border: none; color: palette(text);");
+    m_brushSizeLabel->setStyleSheet(QString("border: none; color: palette(text); font-size: %1px;").arg(FONT_SIZE_BODY));
     m_brushLayout->addWidget(m_brushSizeLabel);
     
     m_brushSizeSpinBox = new BrushSizeSpinBox();
@@ -154,10 +156,10 @@ void ToolPalette::createBrushSizeControls()
     m_brushSizeSpinBox->setKeyboardTracking(false); // Only emit signal when editing is finished
     m_brushSizeSpinBox->setFocusPolicy(Qt::StrongFocus);
     m_brushSizeSpinBox->setStyleSheet(
-        "QSpinBox {"
+        QString("QSpinBox {"
         "    border: 1px solid palette(mid);"
-        "    border-radius: 3px;"
-        "    padding: 2px;"
+        "    border-radius: %1px;"
+        "    padding: 2px;").arg(RADIUS_CONTROL) +
         "    selection-background-color: palette(highlight);"
         "}"
         "QSpinBox:focus {"
@@ -200,7 +202,6 @@ void ToolPalette::createBrushSizeControls()
         "    border: 2px solid palette(text);"
         "    border-bottom: none;"
         "    border-left: none;"
-        "    transform: rotate(-45deg);"
         "}"
         "QSpinBox::down-arrow {"
         "    image: none;"
@@ -209,7 +210,6 @@ void ToolPalette::createBrushSizeControls()
         "    border: 2px solid palette(text);"
         "    border-top: none;"
         "    border-right: none;"
-        "    transform: rotate(-45deg);"
         "}"
     );
     
@@ -226,48 +226,29 @@ void ToolPalette::createColorControls()
     m_colorFrame = new QFrame();
     m_colorFrame->setFrameStyle(QFrame::StyledPanel);
     m_colorFrame->setStyleSheet(
-        "QFrame {"
+        QString("QFrame {"
         "    background-color: palette(window);"
         "    border: 1px solid palette(mid);"
-        "    border-radius: 5px;"
-        "    padding: 5px;"
-        "}"
+        "    border-radius: %1px;"
+        "    padding: %2px;"
+        "}").arg(RADIUS_PANEL).arg(SPACING_XS)
     );
-    
+
     m_colorLayout = new QVBoxLayout(m_colorFrame);
-    m_colorLayout->setSpacing(5);
-    m_colorLayout->setContentsMargins(5, 5, 5, 5);
-    
+    m_colorLayout->setSpacing(SPACING_XS);
+    m_colorLayout->setContentsMargins(SPACING_XS, SPACING_XS, SPACING_XS, SPACING_XS);
+
     // Color title
     QLabel *colorTitle = new QLabel("Color");
-    colorTitle->setStyleSheet("font-weight: bold; color: palette(text); border: none;");
+    colorTitle->setStyleSheet(QString("font-weight: bold; font-size: %1px; color: palette(text); border: none;").arg(FONT_SIZE_BODY));
     colorTitle->setAlignment(Qt::AlignCenter);
     m_colorLayout->addWidget(colorTitle);
     
-    // Color button
+    // Color button — shows current color as a swatch with hex code
     m_colorButton = new QPushButton();
-    m_colorButton->setFixedHeight(40);
-    m_colorButton->setText("🎨");
-    m_colorButton->setToolTip(QString("Current Color: %1\n\nClick to open color picker\nUse eyedropper tool to pick colors from canvas").arg(m_currentColor.name()));
-    m_colorButton->setStyleSheet(
-        QString("QPushButton {"
-                "    background-color: %1;"
-                "    border: 2px solid palette(mid);"
-                "    border-radius: 5px;"
-                "    color: white;"
-                "    font-size: 18px;"
-                "    font-weight: bold;"
-                "    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);"
-                "}"
-                "QPushButton:hover {"
-                "    border: 2px solid palette(highlight);"
-                "    background-color: %1;"
-                "}"
-                "QPushButton:pressed {"
-                "    border: 3px solid palette(highlight);"
-                "}")
-        .arg(m_currentColor.name())
-    );
+    m_colorButton->setFixedHeight(TOOL_BUTTON_SIZE);
+    m_colorButton->setCursor(Qt::PointingHandCursor);
+    updateColorButtonAppearance(m_currentColor);
     connect(m_colorButton, &QPushButton::clicked, this, &ToolPalette::onColorButtonClicked);
     m_colorLayout->addWidget(m_colorButton);
     
@@ -292,9 +273,9 @@ void ToolPalette::createToolButton(ToolType toolType)
     if (!tool) return;
     
     QPushButton *button = new QPushButton();
-    button->setFixedSize(40, 40);
+    button->setFixedSize(TOOL_BUTTON_SIZE, TOOL_BUTTON_SIZE);
     button->setCheckable(true);
-    
+
     // Set icon and tooltip based on tool type
     QString toolName = tool->getName();
     QString tooltip = QString("%1\n\n%2").arg(toolName, tool->getTooltip());
@@ -308,11 +289,11 @@ void ToolPalette::createToolButton(ToolType toolType)
     }
     button->setToolTip(tooltip);
     button->setStyleSheet(
-        "QPushButton {"
+        QString("QPushButton {"
         "    border: 1px solid palette(mid);"
         "    background-color: palette(button);"
-        "    border-radius: 5px;"
-        "    font-size: 16px;"
+        "    border-radius: %1px;"
+        "    font-size: %2px;"
         "    font-weight: normal;"
         "}"
         "QPushButton:checked {"
@@ -326,7 +307,7 @@ void ToolPalette::createToolButton(ToolType toolType)
         "}"
         "QPushButton:pressed {"
         "    background-color: palette(dark);"
-        "}"
+        "}").arg(RADIUS_CONTROL).arg(FONT_SIZE_TITLE)
     );
     
     // Store tool type as property
@@ -374,27 +355,45 @@ void ToolPalette::updateCurrentColor(const QColor &color)
 {
     m_currentColor = color;
     if (m_colorButton) {
-        m_colorButton->setToolTip(QString("Current Color: %1\n\nClick to open color picker\nUse eyedropper tool to pick colors from canvas").arg(color.name()));
-        m_colorButton->setStyleSheet(
-            QString("QPushButton {"
-                    "    background-color: %1;"
-                    "    border: 2px solid palette(mid);"
-                    "    border-radius: 5px;"
-                    "    color: white;"
-                    "    font-size: 18px;"
-                    "    font-weight: bold;"
-                    "    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);"
-                    "}"
-                    "QPushButton:hover {"
-                    "    border: 2px solid palette(highlight);"
-                    "    background-color: %1;"
-                    "}"
-                    "QPushButton:pressed {"
-                    "    border: 3px solid palette(highlight);"
-                    "}")
-            .arg(color.name())
-        );
+        updateColorButtonAppearance(color);
     }
+}
+
+void ToolPalette::updateColorButtonAppearance(const QColor &color)
+{
+    // Choose text color for readability: white on dark colors, dark on light
+    double luminance = 0.299 * color.redF() + 0.587 * color.greenF() + 0.114 * color.blueF();
+    QString textColor = luminance > 0.5 ? "#222222" : "#ffffff";
+    QString shadowColor = luminance > 0.5 ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.5)";
+
+    m_colorButton->setText(color.name().toUpper());
+    m_colorButton->setToolTip(QString("Current Color: %1\nRGB(%2, %3, %4)\n\nClick to open color picker")
+        .arg(color.name().toUpper())
+        .arg(color.red()).arg(color.green()).arg(color.blue()));
+    m_colorButton->setStyleSheet(
+        QString("QPushButton {"
+                "    background-color: %1;"
+                "    border: 2px solid palette(mid);"
+                "    border-radius: %2px;"
+                "    color: %3;"
+                "    font-size: %4px;"
+                "    font-weight: bold;"
+                "    font-family: monospace;"
+                "    text-shadow: 1px 1px 2px %5;"
+                "}"
+                "QPushButton:hover {"
+                "    border: 2px solid palette(highlight);"
+                "    background-color: %1;"
+                "}"
+                "QPushButton:pressed {"
+                "    border: 3px solid palette(highlight);"
+                "}")
+        .arg(color.name())
+        .arg(RADIUS_CONTROL)
+        .arg(textColor)
+        .arg(FONT_SIZE_BODY)
+        .arg(shadowColor)
+    );
 }
 
 void ToolPalette::onToolButtonClicked()

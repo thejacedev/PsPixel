@@ -2,6 +2,7 @@
 #include "ui/tools/toolmanager.h"
 #include "ui/tools/basetool.h"
 #include "ui/tools/selecttool.h"
+#include "ui/tools/lassotool.h"
 #include "ui/layers/layermanager.h"
 #include <QPainter>
 #include <QMouseEvent>
@@ -11,6 +12,7 @@
 #include <QImage>
 #include <QtMath>
 #include <QCursor>
+#include <QPainterPath>
 
 using namespace PixelPaint;
 
@@ -32,6 +34,7 @@ PixelCanvas::PixelCanvas(QWidget *parent)
     , m_previewStartPoint(-1, -1)
     , m_mirrorH(false)
     , m_mirrorV(false)
+    , m_hasSelection(false)
     , m_refOffset(0, 0)
     , m_refOpacity(1.0)
     , m_refScale(1.0)
@@ -107,6 +110,7 @@ void PixelCanvas::setBrushSize(int size)
 void PixelCanvas::clearCanvas()
 {
     m_canvas.fill(Qt::transparent);
+    clearSelection();
     update();
 }
 
@@ -132,6 +136,9 @@ bool PixelCanvas::loadImage(const QString &fileName)
 void PixelCanvas::setPixel(int x, int y, const QColor &color)
 {
     if (x < 0 || x >= m_canvasWidth || y < 0 || y >= m_canvasHeight) return;
+
+    // If a selection exists, only allow writes inside it
+    if (m_hasSelection && !isPixelSelected(x, y)) return;
 
     // Write to active layer if layer manager exists, otherwise to m_canvas
     QImage &target = m_layerManager ? m_layerManager->activeLayer().image : m_canvas;
@@ -165,6 +172,50 @@ QColor PixelCanvas::pixelAt(int x, int y) const
         return m_canvas.pixelColor(x, y);
     }
     return QColor();
+}
+
+// Selection mask methods
+void PixelCanvas::setSelectionMask(const QImage &mask)
+{
+    m_selectionMask = mask;
+    m_hasSelection = !mask.isNull();
+    update();
+}
+
+void PixelCanvas::clearSelection()
+{
+    m_selectionMask = QImage();
+    m_hasSelection = false;
+    update();
+}
+
+bool PixelCanvas::isPixelSelected(int x, int y) const
+{
+    if (!m_hasSelection || m_selectionMask.isNull()) return true;
+    if (x < 0 || x >= m_selectionMask.width() || y < 0 || y >= m_selectionMask.height()) return false;
+    return qGray(m_selectionMask.pixel(x, y)) > 127;
+}
+
+QRect PixelCanvas::selectionBoundingRect() const
+{
+    if (!m_hasSelection || m_selectionMask.isNull()) return QRect();
+
+    int minX = m_selectionMask.width(), minY = m_selectionMask.height();
+    int maxX = -1, maxY = -1;
+
+    for (int y = 0; y < m_selectionMask.height(); ++y) {
+        for (int x = 0; x < m_selectionMask.width(); ++x) {
+            if (qGray(m_selectionMask.pixel(x, y)) > 127) {
+                minX = qMin(minX, x);
+                minY = qMin(minY, y);
+                maxX = qMax(maxX, x);
+                maxY = qMax(maxY, y);
+            }
+        }
+    }
+
+    if (maxX < 0) return QRect();
+    return QRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
 }
 
 void PixelCanvas::loadReferenceImage(const QString &filePath)
@@ -225,6 +276,7 @@ void PixelCanvas::resizeCanvas(int width, int height)
     p.drawImage(0, 0, oldCanvas);
     p.end();
 
+    clearSelection();
     regenerateCheckerboard();
     updateCanvasSize();
     update();
@@ -288,7 +340,7 @@ void PixelCanvas::paintEvent(QPaintEvent *event)
         painter.setOpacity(1.0);
 
         // Blue bounding box
-        QPen boxPen(QColor(0, 120, 215), 2.0 / m_zoomFactor);
+        QPen boxPen(ACCENT_COLOR, 2.0 / m_zoomFactor);
         boxPen.setStyle(m_refActive ? Qt::SolidLine : Qt::DashLine);
         painter.setPen(boxPen);
         painter.setBrush(Qt::NoBrush);
@@ -298,7 +350,7 @@ void PixelCanvas::paintEvent(QPaintEvent *event)
         if (m_refActive) {
             double hs = 8.0 / m_zoomFactor;
             painter.setPen(QPen(Qt::white, 1.0 / m_zoomFactor));
-            painter.setBrush(QColor(0, 120, 215));
+            painter.setBrush(ACCENT_COLOR);
             painter.drawRect(QRectF(imgRect.left() - hs/2, imgRect.top() - hs/2, hs, hs));
             painter.drawRect(QRectF(imgRect.right() - hs/2, imgRect.top() - hs/2, hs, hs));
             painter.drawRect(QRectF(imgRect.left() - hs/2, imgRect.bottom() - hs/2, hs, hs));
@@ -323,6 +375,9 @@ void PixelCanvas::paintEvent(QPaintEvent *event)
             painter.drawLine(0, yPos, m_canvasWidth * m_pixelSize, yPos);
         }
     }
+
+    // Draw selection marching ants (always, regardless of tool or mouse state)
+    drawSelectOverlay(painter);
 
     // Draw tool overlay on top of everything
     drawToolOverlay(painter);
@@ -397,6 +452,12 @@ void PixelCanvas::mouseMoveEvent(QMouseEvent *event)
 {
     // Update mouse position for tool overlay
     m_mousePosition = getGridPosition(event->pos());
+
+    // Emit cursor position for status bar display
+    if (m_mousePosition.x() >= 0 && m_mousePosition.x() < m_canvasWidth &&
+        m_mousePosition.y() >= 0 && m_mousePosition.y() < m_canvasHeight) {
+        emit cursorPositionChanged(m_mousePosition.x(), m_mousePosition.y());
+    }
 
     // Handle reference image resize by dragging corner
     if (m_refResizing && m_refActive && (event->buttons() & Qt::LeftButton)) {
@@ -533,6 +594,7 @@ void PixelCanvas::leaveEvent(QEvent *event)
     Q_UNUSED(event)
     m_mouseOnCanvas = false;
     m_mousePosition = QPoint(-1, -1);
+    emit cursorLeftCanvas();
     update();
 }
 
@@ -693,8 +755,8 @@ void PixelCanvas::drawToolOverlay(QPainter &painter)
             drawLineToolOverlay(painter, m_mousePosition);
             break;
         case ToolType::Select:
-            drawSelectOverlay(painter);
-            break;
+        case ToolType::MagicWand:
+        case ToolType::Lasso:
         default:
             break;
     }
@@ -858,36 +920,73 @@ void PixelCanvas::clearLinePreviewStart()
 
 void PixelCanvas::drawSelectOverlay(QPainter &painter)
 {
-    // Get the select tool to check for active selection
-    if (!m_toolManager) return;
+    // Draw lasso preview while drawing
+    if (m_toolManager) {
+        BaseTool *tool = m_toolManager->getCurrentTool();
+        if (tool && tool->getType() == ToolType::Lasso) {
+            auto *lasso = static_cast<LassoTool*>(tool);
+            if (lasso->isDrawing() && lasso->currentPolygon().size() > 1) {
+                painter.save();
+                QPen lassPen(ACCENT_COLOR, 2.0 / m_zoomFactor, Qt::DashLine);
+                painter.setPen(lassPen);
+                painter.setBrush(Qt::NoBrush);
 
-    BaseTool *tool = m_toolManager->getCurrentTool();
-    if (!tool) return;
+                const QPolygon &poly = lasso->currentPolygon();
+                QPolygonF scaled;
+                for (const QPoint &pt : poly) {
+                    scaled.append(QPointF(pt.x() * m_pixelSize + m_pixelSize / 2.0,
+                                          pt.y() * m_pixelSize + m_pixelSize / 2.0));
+                }
+                painter.drawPolyline(scaled);
+                painter.restore();
+            }
+        }
+    }
 
-    // Dynamic cast to check if it's a SelectTool with a selection
-    // We use the tool's type to avoid including the header
-    if (tool->getType() != ToolType::Select) return;
-
-    // Access the selection rect via a property-like approach
-    // The select tool stores its rect publicly
-    auto *selectTool = static_cast<SelectTool*>(tool);
-    if (!selectTool->hasSelection()) return;
-
-    QRect sel = selectTool->selectionRect();
+    // Render marching ants from canvas selection mask
+    if (!m_hasSelection || m_selectionMask.isNull()) return;
 
     painter.save();
+
+    // Build a region from the mask
+    QRect bounds = selectionBoundingRect();
+    if (bounds.isEmpty()) { painter.restore(); return; }
+
+    // Draw marching ants around the selection boundary
+    // Find border pixels: selected pixels that have at least one unselected neighbor
+    QPainterPath borderPath;
+    for (int y = bounds.top(); y <= bounds.bottom(); ++y) {
+        for (int x = bounds.left(); x <= bounds.right(); ++x) {
+            if (!isPixelSelected(x, y)) continue;
+
+            // Check 4 neighbors — if any is outside or unselected, this pixel has a border edge
+            bool top    = (y == 0 || !isPixelSelected(x, y - 1));
+            bool bottom = (y >= m_canvasHeight - 1 || !isPixelSelected(x, y + 1));
+            bool left   = (x == 0 || !isPixelSelected(x - 1, y));
+            bool right  = (x >= m_canvasWidth - 1 || !isPixelSelected(x + 1, y));
+
+            double px = x * m_pixelSize;
+            double py = y * m_pixelSize;
+            double ps = m_pixelSize;
+
+            if (top)    { borderPath.moveTo(px, py); borderPath.lineTo(px + ps, py); }
+            if (bottom) { borderPath.moveTo(px, py + ps); borderPath.lineTo(px + ps, py + ps); }
+            if (left)   { borderPath.moveTo(px, py); borderPath.lineTo(px, py + ps); }
+            if (right)  { borderPath.moveTo(px + ps, py); borderPath.lineTo(px + ps, py + ps); }
+        }
+    }
+
+    // White dashed line
     QPen dashPen(Qt::white, 2.0 / m_zoomFactor, Qt::DashLine);
     painter.setPen(dashPen);
     painter.setBrush(Qt::NoBrush);
-    QRect drawRect(sel.left() * m_pixelSize, sel.top() * m_pixelSize,
-                   sel.width() * m_pixelSize, sel.height() * m_pixelSize);
-    painter.drawRect(drawRect);
+    painter.drawPath(borderPath);
 
-    // Draw inner black dashes for contrast
+    // Inner black dashes for contrast
     QPen innerPen(Qt::black, 1.0 / m_zoomFactor, Qt::DashLine);
     innerPen.setDashOffset(4);
     painter.setPen(innerPen);
-    painter.drawRect(drawRect);
+    painter.drawPath(borderPath);
 
     painter.restore();
 }
