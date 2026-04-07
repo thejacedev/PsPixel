@@ -12,13 +12,14 @@
 namespace PixelPaint {
 
 class LayerManager;
+class PixelCanvas;
 
 class LayerPalette : public QDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit LayerPalette(LayerManager *layerManager, QWidget *parent = nullptr);
+    explicit LayerPalette(LayerManager *layerManager, PixelCanvas *canvas, QWidget *parent = nullptr);
 
     void refreshList();
 
@@ -36,6 +37,7 @@ private:
     void setupUI();
 
     LayerManager *m_layerManager;
+    PixelCanvas *m_canvas;
     QListWidget *m_layerList;
     QSlider *m_opacitySlider;
     QLabel *m_opacityLabel;

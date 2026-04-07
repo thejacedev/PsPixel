@@ -71,6 +71,22 @@ public:
     bool mirrorHorizontal() const { return m_mirrorH; }
     bool mirrorVertical() const { return m_mirrorV; }
 
+    // Reference image
+    void loadReferenceImage(const QString &filePath);
+    void clearReferenceImage();
+    bool hasReferenceImage() const { return !m_refImage.isNull(); }
+    void setReferenceOpacity(double opacity) { m_refOpacity = opacity; update(); }
+    double referenceOpacity() const { return m_refOpacity; }
+    void setReferenceOffset(const QPointF &offset) { m_refOffset = offset; update(); }
+    QPointF referenceOffset() const { return m_refOffset; }
+    void setReferenceLocked(bool locked) { m_refLocked = locked; }
+    bool referenceLocked() const { return m_refLocked; }
+    void setReferenceScale(double scale) { m_refScale = qBound(0.1, scale, 10.0); update(); }
+    double referenceScale() const { return m_refScale; }
+    void setReferenceActive(bool active) { m_refActive = active; update(); }
+    bool referenceActive() const { return m_refActive; }
+    QColor referencePixelAt(int x, int y) const;
+
     // Tool interaction methods
     void setLinePreviewStart(const QPoint &startPoint);
     void clearLinePreviewStart();
@@ -80,6 +96,7 @@ public:
 
 signals:
     void zoomFactorChanged(double factor);
+    void referenceImageChanged();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -144,6 +161,20 @@ private:
     // Mirror/Symmetry state
     bool m_mirrorH;
     bool m_mirrorV;
+
+    // Reference image
+    QImage m_refImage;
+    QPointF m_refOffset;
+    double m_refOpacity;
+    double m_refScale;
+    bool m_refLocked;
+    bool m_refActive;
+    bool m_refDragging;
+    bool m_refResizing;
+    QPoint m_refDragStart;
+    double m_refResizeStartScale;
+    QPointF m_refResizeStartOffset;
+    int m_refResizeCorner; // 0=TL 1=TR 2=BL 3=BR
 };
 
 } // namespace PixelPaint

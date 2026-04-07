@@ -32,8 +32,28 @@ void EyedropperTool::onMouseRelease(const QPoint &canvasPos, Qt::MouseButton but
 
 QColor EyedropperTool::getPixelColor(int x, int y) const
 {
-    if (!m_canvas || !isValidPosition(x, y)) {
+    if (!m_canvas) return QColor();
+
+    // If reference layer is active, always sample from reference
+    if (m_canvas->referenceActive() && m_canvas->hasReferenceImage()) {
+        QColor refColor = m_canvas->referencePixelAt(x, y);
+        if (refColor.isValid() && refColor.alpha() > 0) {
+            return refColor;
+        }
         return QColor();
     }
-    return m_canvas->pixelAt(x, y);
+
+    if (!isValidPosition(x, y)) return QColor();
+
+    QColor canvasColor = m_canvas->pixelAt(x, y);
+
+    // If canvas pixel is transparent, try reference image
+    if (canvasColor.alpha() == 0 && m_canvas->hasReferenceImage()) {
+        QColor refColor = m_canvas->referencePixelAt(x, y);
+        if (refColor.isValid() && refColor.alpha() > 0) {
+            return refColor;
+        }
+    }
+
+    return canvasColor;
 }

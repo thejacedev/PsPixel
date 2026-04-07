@@ -112,7 +112,7 @@ void MainWindow::setupUI()
     m_layerManager2->reset(DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT);
     m_canvas->setLayerManager(m_layerManager2);
 
-    m_layerPalette = new LayerPalette(m_layerManager2, this);
+    m_layerPalette = new LayerPalette(m_layerManager2, m_canvas, this);
     addDockWidget(Qt::RightDockWidgetArea, m_layerPalette);
 
     setDockOptions(QMainWindow::AllowNestedDocks | QMainWindow::AnimatedDocks);
@@ -276,6 +276,51 @@ void MainWindow::setupMenuBar()
     connect(m_mirrorVAction, &QAction::toggled, this, [this](bool on) {
         if (m_canvas) m_canvas->setMirrorVertical(on);
     });
+
+    viewMenu->addSeparator();
+
+    QMenu *refMenu = viewMenu->addMenu("Reference Image");
+
+    QAction *loadRefAction = refMenu->addAction("Load...");
+    connect(loadRefAction, &QAction::triggered, this, [this]() {
+        if (!m_canvas) return;
+        QString file = QFileDialog::getOpenFileName(this, "Load Reference Image", "",
+            "Images (*.png *.jpg *.jpeg *.bmp);;All Files (*)");
+        if (!file.isEmpty()) m_canvas->loadReferenceImage(file);
+    });
+
+    QAction *clearRefAction = refMenu->addAction("Clear");
+    connect(clearRefAction, &QAction::triggered, this, [this]() {
+        if (m_canvas) m_canvas->clearReferenceImage();
+    });
+
+    refMenu->addSeparator();
+
+    QAction *lockRefAction = refMenu->addAction("Lock Position");
+    lockRefAction->setCheckable(true);
+    connect(lockRefAction, &QAction::toggled, this, [this](bool on) {
+        if (m_canvas) m_canvas->setReferenceLocked(on);
+    });
+
+    refMenu->addSeparator();
+
+    // Opacity presets
+    QMenu *opacityMenu = refMenu->addMenu("Opacity");
+    for (int pct : {25, 50, 75, 100}) {
+        QAction *a = opacityMenu->addAction(QString("%1%").arg(pct));
+        connect(a, &QAction::triggered, this, [this, pct]() {
+            if (m_canvas) m_canvas->setReferenceOpacity(pct / 100.0);
+        });
+    }
+
+    // Scale presets
+    QMenu *scaleMenu = refMenu->addMenu("Scale");
+    for (int pct : {25, 50, 100, 200, 400}) {
+        QAction *a = scaleMenu->addAction(QString("%1%").arg(pct));
+        connect(a, &QAction::triggered, this, [this, pct]() {
+            if (m_canvas) m_canvas->setReferenceScale(pct / 100.0);
+        });
+    }
 
     // Tool shortcuts (respect saved keybindings)
     auto addToolShortcut = [this](const QString &bindingKey, ToolType toolType) {

@@ -1,21 +1,27 @@
 #include "layerpalette.h"
 #include "layermanager.h"
+#include "pixelcanvas.h"
 #include <QInputDialog>
 #include <QApplication>
 
 using namespace PixelPaint;
 
-LayerPalette::LayerPalette(LayerManager *layerManager, QWidget *parent)
+LayerPalette::LayerPalette(LayerManager *layerManager, PixelCanvas *canvas, QWidget *parent)
     : QDockWidget("Layers", parent)
     , m_layerManager(layerManager)
+    , m_canvas(canvas)
 {
     setupUI();
 
     if (m_layerManager) {
         connect(m_layerManager, &LayerManager::layersChanged, this, &LayerPalette::refreshList);
-        connect(m_layerManager, &LayerManager::activeLayerChanged, this, [this](int index) {
-            m_layerList->setCurrentRow(m_layerManager->layerCount() - 1 - index);
+        connect(m_layerManager, &LayerManager::activeLayerChanged, this, [this](int) {
+            refreshList();
         });
+    }
+
+    if (m_canvas) {
+        connect(m_canvas, &PixelCanvas::referenceImageChanged, this, &LayerPalette::refreshList);
     }
 
     refreshList();
@@ -101,6 +107,26 @@ void LayerPalette::refreshList()
     m_layerList->blockSignals(true);
     m_layerList->clear();
 
+    bool refActive = m_canvas && m_canvas->referenceActive();
+
+    // Reference image entry at the top (if loaded)
+    if (m_canvas && m_canvas->hasReferenceImage()) {
+        QListWidgetItem *refItem = new QListWidgetItem();
+        refItem->setText("Reference");
+        refItem->setFlags(refItem->flags() | Qt::ItemIsUserCheckable);
+        refItem->setCheckState(Qt::Checked);
+        refItem->setData(Qt::UserRole, -1); // special index
+        refItem->setForeground(QBrush(QColor(0, 120, 215)));
+        QFont f = refItem->font();
+        f.setItalic(true);
+        if (refActive) {
+            refItem->setBackground(QBrush(QColor(0, 120, 215, 60)));
+            f.setBold(true);
+        }
+        refItem->setFont(f);
+        m_layerList->addItem(refItem);
+    }
+
     // Show layers top-to-bottom (highest index = frontmost = top of list)
     for (int i = m_layerManager->layerCount() - 1; i >= 0; --i) {
         const Layer &layer = m_layerManager->layerAt(i);
@@ -110,7 +136,7 @@ void LayerPalette::refreshList()
         item->setCheckState(layer.visible ? Qt::Checked : Qt::Unchecked);
         item->setData(Qt::UserRole, i);
 
-        if (i == m_layerManager->activeLayerIndex()) {
+        if (!refActive && i == m_layerManager->activeLayerIndex()) {
             item->setBackground(QBrush(QColor(100, 150, 200, 100)));
             QFont f = item->font();
             f.setBold(true);
@@ -120,16 +146,24 @@ void LayerPalette::refreshList()
         m_layerList->addItem(item);
     }
 
-    // Select active layer row
-    int activeRow = m_layerManager->layerCount() - 1 - m_layerManager->activeLayerIndex();
-    m_layerList->setCurrentRow(activeRow);
+    // Select the right row
+    if (refActive) {
+        m_layerList->setCurrentRow(0);
+        m_opacitySlider->blockSignals(true);
+        m_opacitySlider->setValue(static_cast<int>(m_canvas->referenceOpacity() * 100));
+        m_opacitySlider->blockSignals(false);
+        m_opacityLabel->setText(QString("%1%").arg(static_cast<int>(m_canvas->referenceOpacity() * 100)));
+    } else {
+        int refOffset = (m_canvas && m_canvas->hasReferenceImage()) ? 1 : 0;
+        int activeRow = refOffset + m_layerManager->layerCount() - 1 - m_layerManager->activeLayerIndex();
+        m_layerList->setCurrentRow(activeRow);
 
-    // Update opacity slider
-    const Layer &active = m_layerManager->activeLayer();
-    m_opacitySlider->blockSignals(true);
-    m_opacitySlider->setValue(static_cast<int>(active.opacity * 100));
-    m_opacitySlider->blockSignals(false);
-    m_opacityLabel->setText(QString("%1%").arg(static_cast<int>(active.opacity * 100)));
+        const Layer &active = m_layerManager->activeLayer();
+        m_opacitySlider->blockSignals(true);
+        m_opacitySlider->setValue(static_cast<int>(active.opacity * 100));
+        m_opacitySlider->blockSignals(false);
+        m_opacityLabel->setText(QString("%1%").arg(static_cast<int>(active.opacity * 100)));
+    }
 
     m_layerList->blockSignals(false);
 }
@@ -181,16 +215,35 @@ void LayerPalette::onDuplicateLayer()
 
 void LayerPalette::onLayerClicked(int row)
 {
-    if (!m_layerManager || row < 0) return;
-    // Convert visual row (top=front) to layer index (0=back)
-    int layerIndex = m_layerManager->layerCount() - 1 - row;
-    m_layerManager->setActiveLayer(layerIndex);
+    // Guard against signals during refreshList rebuild
+    if (!m_layerManager || row < 0 || row >= m_layerList->count()) return;
+
+    QListWidgetItem *item = m_layerList->item(row);
+    if (!item) return;
+
+    int layerIndex = item->data(Qt::UserRole).toInt();
+
+    if (layerIndex == -1) {
+        // Reference layer selected — enable ref mode
+        if (m_canvas) m_canvas->setReferenceActive(true);
+        refreshList();
+    } else {
+        // Normal layer selected — disable ref mode, switch layer
+        if (m_canvas) m_canvas->setReferenceActive(false);
+        m_layerManager->setActiveLayer(layerIndex);
+        // refreshList is triggered by activeLayerChanged signal
+    }
 }
 
 void LayerPalette::onOpacityChanged(int value)
 {
     if (!m_layerManager) return;
-    m_layerManager->setLayerOpacity(m_layerManager->activeLayerIndex(), value / 100.0);
+
+    if (m_canvas && m_canvas->referenceActive()) {
+        m_canvas->setReferenceOpacity(value / 100.0);
+    } else {
+        m_layerManager->setLayerOpacity(m_layerManager->activeLayerIndex(), value / 100.0);
+    }
     m_opacityLabel->setText(QString("%1%").arg(value));
 }
 
@@ -198,5 +251,16 @@ void LayerPalette::onVisibilityToggled(QListWidgetItem *item)
 {
     if (!m_layerManager || !item) return;
     int layerIndex = item->data(Qt::UserRole).toInt();
+
+    if (layerIndex == -1 && m_canvas) {
+        // Toggle reference visibility via opacity
+        if (item->checkState() == Qt::Checked) {
+            m_canvas->setReferenceOpacity(1.0);
+        } else {
+            m_canvas->setReferenceOpacity(0.0);
+        }
+        return;
+    }
+
     m_layerManager->setLayerVisible(layerIndex, item->checkState() == Qt::Checked);
 }

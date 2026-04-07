@@ -32,6 +32,15 @@ PixelCanvas::PixelCanvas(QWidget *parent)
     , m_previewStartPoint(-1, -1)
     , m_mirrorH(false)
     , m_mirrorV(false)
+    , m_refOffset(0, 0)
+    , m_refOpacity(1.0)
+    , m_refScale(1.0)
+    , m_refLocked(false)
+    , m_refActive(false)
+    , m_refDragging(false)
+    , m_refResizing(false)
+    , m_refResizeStartScale(1.0)
+    , m_refResizeCorner(3)
 {
     initializeCanvas();
     updateCanvasSize();
@@ -158,6 +167,48 @@ QColor PixelCanvas::pixelAt(int x, int y) const
     return QColor();
 }
 
+void PixelCanvas::loadReferenceImage(const QString &filePath)
+{
+    QImage img(filePath);
+    if (img.isNull()) return;
+    m_refImage = img.convertToFormat(QImage::Format_ARGB32);
+    m_refOffset = QPointF(0, 0);
+    m_refScale = 1.0;
+    update();
+    emit referenceImageChanged();
+}
+
+void PixelCanvas::clearReferenceImage()
+{
+    m_refImage = QImage();
+    m_refActive = false;
+    update();
+    emit referenceImageChanged();
+}
+
+QColor PixelCanvas::referencePixelAt(int x, int y) const
+{
+    if (m_refImage.isNull() || m_refScale <= 0) return QColor();
+
+    // Canvas pixel (x,y) → reference image pixel, accounting for offset and scale
+    // The ref is drawn at screen pos (offset * pixelSize) with size (imgSize * scale)
+    // In canvas-pixel-size space: refX = offset.x * pixelSize, so in canvas-pixel coords
+    // the ref starts at offset.x and each ref pixel covers (scale / pixelSize) canvas pixels
+    // But the ref is drawn outside the pixelSize scale, so 1 ref pixel = (scale) canvas-pixel-size units
+    // In canvas pixel coords: ref pixel = (canvasPixel - offset) * pixelSize / scale
+
+    double rx = (x - m_refOffset.x()) * m_pixelSize / m_refScale;
+    double ry = (y - m_refOffset.y()) * m_pixelSize / m_refScale;
+
+    int ix = static_cast<int>(rx);
+    int iy = static_cast<int>(ry);
+
+    if (ix < 0 || iy < 0 || ix >= m_refImage.width() || iy >= m_refImage.height()) {
+        return QColor();
+    }
+    return m_refImage.pixelColor(ix, iy);
+}
+
 void PixelCanvas::resizeCanvas(int width, int height)
 {
     QImage oldCanvas = m_canvas;
@@ -222,6 +273,41 @@ void PixelCanvas::paintEvent(QPaintEvent *event)
     }
     painter.restore();
 
+    // Draw reference image with blue bounding box
+    if (!m_refImage.isNull()) {
+        double drawX = m_refOffset.x() * m_pixelSize;
+        double drawY = m_refOffset.y() * m_pixelSize;
+        double drawW = m_refImage.width() * m_refScale;
+        double drawH = m_refImage.height() * m_refScale;
+        QRectF imgRect(drawX, drawY, drawW, drawH);
+
+        painter.save();
+        painter.setOpacity(m_refOpacity);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        painter.drawImage(imgRect, m_refImage);
+        painter.setOpacity(1.0);
+
+        // Blue bounding box
+        QPen boxPen(QColor(0, 120, 215), 2.0 / m_zoomFactor);
+        boxPen.setStyle(m_refActive ? Qt::SolidLine : Qt::DashLine);
+        painter.setPen(boxPen);
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(imgRect);
+
+        // Corner drag handles when active
+        if (m_refActive) {
+            double hs = 8.0 / m_zoomFactor;
+            painter.setPen(QPen(Qt::white, 1.0 / m_zoomFactor));
+            painter.setBrush(QColor(0, 120, 215));
+            painter.drawRect(QRectF(imgRect.left() - hs/2, imgRect.top() - hs/2, hs, hs));
+            painter.drawRect(QRectF(imgRect.right() - hs/2, imgRect.top() - hs/2, hs, hs));
+            painter.drawRect(QRectF(imgRect.left() - hs/2, imgRect.bottom() - hs/2, hs, hs));
+            painter.drawRect(QRectF(imgRect.right() - hs/2, imgRect.bottom() - hs/2, hs, hs));
+        }
+
+        painter.restore();
+    }
+
     // Draw grid (only if pixels are large enough to be visible)
     const double effectivePixelSize = m_pixelSize * m_zoomFactor;
     if (effectivePixelSize >= 4.0) {
@@ -244,6 +330,47 @@ void PixelCanvas::paintEvent(QPaintEvent *event)
 
 void PixelCanvas::mousePressEvent(QMouseEvent *event)
 {
+    // When reference layer is selected, handle move/resize — but only if clicking ON the ref
+    if (m_refActive && !m_refImage.isNull() && event->button() == Qt::LeftButton) {
+        QPointF canvasClick = widgetToCanvas(QPointF(event->pos()));
+        double cx = canvasClick.x();
+        double cy = canvasClick.y();
+        double rw = m_refImage.width() * m_refScale;
+        double rh = m_refImage.height() * m_refScale;
+        double handleSize = 12.0 / m_zoomFactor;
+        QRectF refRect(m_refOffset.x() * m_pixelSize, m_refOffset.y() * m_pixelSize, rw, rh);
+
+        // Check corners first
+        int corner = -1;
+        if (QRectF(refRect.left() - handleSize, refRect.top() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 0;
+        else if (QRectF(refRect.right() - handleSize, refRect.top() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 1;
+        else if (QRectF(refRect.left() - handleSize, refRect.bottom() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 2;
+        else if (QRectF(refRect.right() - handleSize, refRect.bottom() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 3;
+
+        if (corner >= 0) {
+            m_refResizing = true;
+            m_refDragging = false;
+            m_refResizeCorner = corner;
+            m_refDragStart = event->pos();
+            m_refResizeStartScale = m_refScale;
+            m_refResizeStartOffset = m_refOffset;
+            setCursor(Qt::SizeFDiagCursor);
+            return;
+        }
+
+        // Body — intercept for move, UNLESS current tool is eyedropper
+        bool isEyedropper = m_toolManager && m_toolManager->getCurrentToolType() == ToolType::Eyedropper;
+        if (refRect.contains(cx, cy) && !isEyedropper) {
+            m_refDragging = true;
+            m_refResizing = false;
+            m_refDragStart = event->pos();
+            setCursor(Qt::ClosedHandCursor);
+            return;
+        }
+
+        // Click is outside the ref image — fall through to tools below
+    }
+
     // Handle panning with middle mouse button
     if (event->button() == Qt::MiddleButton) {
         m_panning = true;
@@ -270,6 +397,51 @@ void PixelCanvas::mouseMoveEvent(QMouseEvent *event)
 {
     // Update mouse position for tool overlay
     m_mousePosition = getGridPosition(event->pos());
+
+    // Handle reference image resize by dragging corner
+    if (m_refResizing && m_refActive && (event->buttons() & Qt::LeftButton)) {
+        QPoint delta = event->pos() - m_refDragStart;
+        double screenToCanvas = m_zoomFactor * m_pixelSize;
+
+        // Scale based on how far the corner moved diagonally
+        double diag = (delta.x() + delta.y()) / screenToCanvas;
+        double origW = m_refImage.width() * m_refResizeStartScale;
+        double newScale = m_refResizeStartScale * (1.0 + diag / qMax(1.0, origW));
+        m_refScale = qBound(0.05, newScale, 20.0);
+
+        update();
+        return;
+    }
+
+    // Handle reference image move by dragging body
+    if (m_refDragging && m_refActive && (event->buttons() & Qt::LeftButton)) {
+        QPointF delta = QPointF(event->pos() - m_refDragStart);
+        double screenToCanvas = m_zoomFactor * m_pixelSize;
+        m_refOffset += QPointF(delta.x() / screenToCanvas, delta.y() / screenToCanvas);
+        m_refDragStart = event->pos();
+        update();
+        return;
+    }
+
+    // Update cursor when hovering ref image
+    if (m_refActive && !m_refImage.isNull() && !(event->buttons())) {
+        QPointF canvasClick = widgetToCanvas(QPointF(event->pos()));
+        double cx = canvasClick.x(), cy = canvasClick.y();
+        double rw = m_refImage.width() * m_refScale;
+        double rh = m_refImage.height() * m_refScale;
+        QRectF refRect(m_refOffset.x() * m_pixelSize, m_refOffset.y() * m_pixelSize, rw, rh);
+        double hs = 12.0 / m_zoomFactor;
+
+        bool onCorner =
+            QRectF(refRect.left()-hs, refRect.top()-hs, hs*2, hs*2).contains(cx,cy) ||
+            QRectF(refRect.right()-hs, refRect.top()-hs, hs*2, hs*2).contains(cx,cy) ||
+            QRectF(refRect.left()-hs, refRect.bottom()-hs, hs*2, hs*2).contains(cx,cy) ||
+            QRectF(refRect.right()-hs, refRect.bottom()-hs, hs*2, hs*2).contains(cx,cy);
+
+        if (onCorner) setCursor(Qt::SizeFDiagCursor);
+        else if (refRect.contains(cx, cy)) setCursor(Qt::OpenHandCursor);
+        else setCursor(Qt::ArrowCursor);
+    }
 
     // Handle panning
     if (m_panning && (event->buttons() & Qt::MiddleButton)) {
@@ -300,6 +472,14 @@ void PixelCanvas::mouseMoveEvent(QMouseEvent *event)
 
 void PixelCanvas::mouseReleaseEvent(QMouseEvent *event)
 {
+    // Handle reference image drag/resize end
+    if (event->button() == Qt::LeftButton && (m_refDragging || m_refResizing)) {
+        m_refDragging = false;
+        m_refResizing = false;
+        setCursor(m_refActive ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        return;
+    }
+
     // Handle panning
     if (event->button() == Qt::MiddleButton) {
         m_panning = false;
