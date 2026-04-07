@@ -225,6 +225,7 @@ void PixelCanvas::loadReferenceImage(const QString &filePath)
     m_refImage = img.convertToFormat(QImage::Format_ARGB32);
     m_refOffset = QPointF(0, 0);
     m_refScale = 1.0;
+    m_refActive = false; // Don't auto-activate — user must select ref layer to move/resize
     update();
     emit referenceImageChanged();
 }
@@ -385,45 +386,45 @@ void PixelCanvas::paintEvent(QPaintEvent *event)
 
 void PixelCanvas::mousePressEvent(QMouseEvent *event)
 {
-    // When reference layer is selected, handle move/resize — but only if clicking ON the ref
-    if (m_refActive && !m_refImage.isNull() && event->button() == Qt::LeftButton) {
-        QPointF canvasClick = widgetToCanvas(QPointF(event->pos()));
-        double cx = canvasClick.x();
-        double cy = canvasClick.y();
-        double rw = m_refImage.width() * m_refScale;
-        double rh = m_refImage.height() * m_refScale;
-        double handleSize = 12.0 / m_zoomFactor;
-        QRectF refRect(m_refOffset.x() * m_pixelSize, m_refOffset.y() * m_pixelSize, rw, rh);
-
-        // Check corners first
-        int corner = -1;
-        if (QRectF(refRect.left() - handleSize, refRect.top() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 0;
-        else if (QRectF(refRect.right() - handleSize, refRect.top() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 1;
-        else if (QRectF(refRect.left() - handleSize, refRect.bottom() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 2;
-        else if (QRectF(refRect.right() - handleSize, refRect.bottom() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 3;
-
-        if (corner >= 0) {
-            m_refResizing = true;
-            m_refDragging = false;
-            m_refResizeCorner = corner;
-            m_refDragStart = event->pos();
-            m_refResizeStartScale = m_refScale;
-            m_refResizeStartOffset = m_refOffset;
-            setCursor(Qt::SizeFDiagCursor);
-            return;
-        }
-
-        // Body — intercept for move, UNLESS current tool is eyedropper
+    // Reference image move/resize — ONLY when ref layer is explicitly selected in layer palette
+    // Eyedropper is always exempt (it should sample colors from anywhere)
+    if (m_refActive && !m_refLocked && !m_refImage.isNull() && event->button() == Qt::LeftButton) {
         bool isEyedropper = m_toolManager && m_toolManager->getCurrentToolType() == ToolType::Eyedropper;
-        if (refRect.contains(cx, cy) && !isEyedropper) {
-            m_refDragging = true;
-            m_refResizing = false;
-            m_refDragStart = event->pos();
-            setCursor(Qt::ClosedHandCursor);
-            return;
-        }
+        if (!isEyedropper) {
+            QPointF canvasClick = widgetToCanvas(QPointF(event->pos()));
+            double cx = canvasClick.x();
+            double cy = canvasClick.y();
+            double rw = m_refImage.width() * m_refScale;
+            double rh = m_refImage.height() * m_refScale;
+            double handleSize = 12.0 / m_zoomFactor;
+            QRectF refRect(m_refOffset.x() * m_pixelSize, m_refOffset.y() * m_pixelSize, rw, rh);
 
-        // Click is outside the ref image — fall through to tools below
+            // Check corners first
+            int corner = -1;
+            if (QRectF(refRect.left() - handleSize, refRect.top() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 0;
+            else if (QRectF(refRect.right() - handleSize, refRect.top() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 1;
+            else if (QRectF(refRect.left() - handleSize, refRect.bottom() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 2;
+            else if (QRectF(refRect.right() - handleSize, refRect.bottom() - handleSize, handleSize*2, handleSize*2).contains(cx, cy)) corner = 3;
+
+            if (corner >= 0) {
+                m_refResizing = true;
+                m_refDragging = false;
+                m_refResizeCorner = corner;
+                m_refDragStart = event->pos();
+                m_refResizeStartScale = m_refScale;
+                m_refResizeStartOffset = m_refOffset;
+                setCursor(Qt::SizeFDiagCursor);
+                return;
+            }
+
+            if (refRect.contains(cx, cy)) {
+                m_refDragging = true;
+                m_refResizing = false;
+                m_refDragStart = event->pos();
+                setCursor(Qt::ClosedHandCursor);
+                return;
+            }
+        }
     }
 
     // Handle panning with middle mouse button
@@ -484,24 +485,27 @@ void PixelCanvas::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
-    // Update cursor when hovering ref image
-    if (m_refActive && !m_refImage.isNull() && !(event->buttons())) {
-        QPointF canvasClick = widgetToCanvas(QPointF(event->pos()));
-        double cx = canvasClick.x(), cy = canvasClick.y();
-        double rw = m_refImage.width() * m_refScale;
-        double rh = m_refImage.height() * m_refScale;
-        QRectF refRect(m_refOffset.x() * m_pixelSize, m_refOffset.y() * m_pixelSize, rw, rh);
-        double hs = 12.0 / m_zoomFactor;
+    // Update cursor when hovering ref image — only when ref layer is selected
+    if (m_refActive && !m_refLocked && !m_refImage.isNull() && !(event->buttons())) {
+        bool isEyedropper = m_toolManager && m_toolManager->getCurrentToolType() == ToolType::Eyedropper;
+        if (!isEyedropper) {
+            QPointF canvasClick = widgetToCanvas(QPointF(event->pos()));
+            double cx = canvasClick.x(), cy = canvasClick.y();
+            double rw = m_refImage.width() * m_refScale;
+            double rh = m_refImage.height() * m_refScale;
+            QRectF refRect(m_refOffset.x() * m_pixelSize, m_refOffset.y() * m_pixelSize, rw, rh);
+            double hs = 12.0 / m_zoomFactor;
 
-        bool onCorner =
-            QRectF(refRect.left()-hs, refRect.top()-hs, hs*2, hs*2).contains(cx,cy) ||
-            QRectF(refRect.right()-hs, refRect.top()-hs, hs*2, hs*2).contains(cx,cy) ||
-            QRectF(refRect.left()-hs, refRect.bottom()-hs, hs*2, hs*2).contains(cx,cy) ||
-            QRectF(refRect.right()-hs, refRect.bottom()-hs, hs*2, hs*2).contains(cx,cy);
+            bool onCorner =
+                QRectF(refRect.left()-hs, refRect.top()-hs, hs*2, hs*2).contains(cx,cy) ||
+                QRectF(refRect.right()-hs, refRect.top()-hs, hs*2, hs*2).contains(cx,cy) ||
+                QRectF(refRect.left()-hs, refRect.bottom()-hs, hs*2, hs*2).contains(cx,cy) ||
+                QRectF(refRect.right()-hs, refRect.bottom()-hs, hs*2, hs*2).contains(cx,cy);
 
-        if (onCorner) setCursor(Qt::SizeFDiagCursor);
-        else if (refRect.contains(cx, cy)) setCursor(Qt::OpenHandCursor);
-        else setCursor(Qt::ArrowCursor);
+            if (onCorner) setCursor(Qt::SizeFDiagCursor);
+            else if (refRect.contains(cx, cy)) setCursor(Qt::OpenHandCursor);
+            else setCursor(Qt::ArrowCursor);
+        }
     }
 
     // Handle panning
