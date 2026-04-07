@@ -30,14 +30,14 @@ RequestExecutionLevel admin
 !insertmacro MUI_LANGUAGE "English"
 
 ; Version Information
-VIProductVersion "1.0.0.0"
+VIProductVersion "1.0.1.0"
 VIAddVersionKey "ProductName" "PsPixel"
 VIAddVersionKey "Comments" "Professional Pixel Art Editor"
 VIAddVersionKey "CompanyName" "Jace Sleeman"
 VIAddVersionKey "LegalTrademarks" "PsPixel is a trademark of Jace Sleeman"
-VIAddVersionKey "LegalCopyright" "© 2024 Jace Sleeman"
+VIAddVersionKey "LegalCopyright" "© 2026 Jace Sleeman"
 VIAddVersionKey "FileDescription" "PsPixel Installer"
-VIAddVersionKey "FileVersion" "1.0.0.0"
+VIAddVersionKey "FileVersion" "1.0.1.0"
 
 ; Installer sections
 Section "PsPixel" SecMain
@@ -68,7 +68,7 @@ Section "PsPixel" SecMain
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PsPixel" "DisplayName" "PsPixel"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PsPixel" "DisplayIcon" "$INSTDIR\PsPixel.exe,0"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PsPixel" "Publisher" "Jace Sleeman"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PsPixel" "DisplayVersion" "1.0.0"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PsPixel" "DisplayVersion" "1.0.1"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PsPixel" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PsPixel" "NoModify" 1
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PsPixel" "NoRepair" 1
