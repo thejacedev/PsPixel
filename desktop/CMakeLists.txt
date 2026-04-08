@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PsPixel VERSION 1.0.2)
+project(PsPixel VERSION 1.0.3)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,7 +15,7 @@ configure_file(
 )
 
 # Include directories
-include_directories(include ${CMAKE_CURRENT_BINARY_DIR}/generated)
+include_directories(include src ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
 # Source files
 set(SOURCES
@@ -41,6 +41,10 @@ set(SOURCES
     src/ui/tools/magicwandtool.cpp
     src/ui/tools/lassotool.cpp
     src/ui/tools/toolmanager.cpp
+    src/ui/animation/animationcontroller.cpp
+    src/ui/animation/animationpalette.cpp
+    src/export/gifencoder.cpp
+    src/export/spritesheetexporter.cpp
     src/ui/tools/toolpalette.cpp
     src/ui/history/historymanager.cpp
     src/ui/history/historypalette.cpp

@@ -116,6 +116,11 @@ void PixelCanvas::clearCanvas()
 
 bool PixelCanvas::saveImage(const QString &fileName)
 {
+    // Composite all visible layers for export (not just the raw internal buffer)
+    if (m_layerManager) {
+        QImage composite = m_layerManager->compositeAll(m_canvasWidth, m_canvasHeight);
+        return composite.save(fileName);
+    }
     return m_canvas.save(fileName);
 }
 

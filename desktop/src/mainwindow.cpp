@@ -8,6 +8,8 @@
 #include "ui/top/autoupdater.h"
 #include "fileformat/pspxformat.h"
 #include "ui/start/startscreen.h"
+#include "ui/animation/animationcontroller.h"
+#include "ui/animation/animationpalette.h"
 #include "ui/tools/toolmanager.h"
 #include "ui/tools/toolpalette.h"
 #include "ui/tools/selecttool.h"
@@ -55,6 +57,8 @@ MainWindow::MainWindow(QWidget *parent)
     , m_currentColor(Qt::black)
     , m_projectModified(false)
     , m_updater(nullptr)
+    , m_animController(nullptr)
+    , m_animPalette(nullptr)
 {
     setupWindow();
     setupMenuBar();
@@ -118,6 +122,11 @@ void MainWindow::setupUI()
 
     m_layerPalette = new LayerPalette(m_layerManager2, m_canvas, this);
     addDockWidget(Qt::RightDockWidgetArea, m_layerPalette);
+
+    // Animation system
+    m_animController = new AnimationController(m_layerManager2, this);
+    m_animPalette = new AnimationPalette(m_animController, m_layerManager2, this);
+    addDockWidget(Qt::BottomDockWidgetArea, m_animPalette);
 
     setDockOptions(QMainWindow::AllowNestedDocks | QMainWindow::AnimatedDocks);
 
@@ -276,7 +285,17 @@ void MainWindow::setupMenuBar()
             m_historyPalette->setVisible(checked);
         }
     });
-    
+
+    QAction *toggleAnimPaletteAction = viewMenu->addAction("Animation Timeline");
+    toggleAnimPaletteAction->setCheckable(true);
+    toggleAnimPaletteAction->setChecked(true);
+    toggleAnimPaletteAction->setShortcut(QKeySequence("F3"));
+    connect(toggleAnimPaletteAction, &QAction::triggered, this, [this](bool checked) {
+        if (m_animPalette) {
+            m_animPalette->setVisible(checked);
+        }
+    });
+
     viewMenu->addSeparator();
 
     m_mirrorHAction = viewMenu->addAction("Mirror Horizontal");
@@ -894,6 +913,7 @@ void MainWindow::showStartScreen()
     if (m_toolPalette) m_toolPalette->hide();
     if (m_historyPalette) m_historyPalette->hide();
     if (m_layerPalette) m_layerPalette->hide();
+    if (m_animPalette) m_animPalette->hide();
 
     setCentralWidget(m_startScreen);
 }
@@ -912,6 +932,7 @@ void MainWindow::showMainInterface()
     if (m_toolPalette) m_toolPalette->show();
     if (m_historyPalette) m_historyPalette->show();
     if (m_layerPalette) m_layerPalette->show();
+    if (m_animPalette) m_animPalette->show();
 
     setCentralWidget(m_centralWidget);
 }

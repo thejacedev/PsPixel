@@ -32,6 +32,8 @@ class HistoryPalette;
 class LayerManager;
 class LayerPalette;
 class AutoUpdater;
+class AnimationController;
+class AnimationPalette;
 
 class MainWindow : public QMainWindow
 {
@@ -142,6 +144,8 @@ private:
     QVector<QColor> m_customColors;
     QImage m_clipboard;
     AutoUpdater *m_updater;
+    AnimationController *m_animController;
+    AnimationPalette *m_animPalette;
 };
 
 } // namespace PixelPaint

@@ -71,6 +71,12 @@ constexpr int FONT_SIZE_CAPTION = 10;
 // Design system: Disabled/secondary text
 const QColor TEXT_DISABLED(128, 128, 128);
 
+// Animation defaults
+constexpr int ANIM_DEFAULT_FPS = 12;
+constexpr int ANIM_MIN_FPS = 1;
+constexpr int ANIM_MAX_FPS = 60;
+constexpr int ANIM_THUMBNAIL_SIZE = 48;
+
 // Tool types
 enum class ToolType {
     Select,
